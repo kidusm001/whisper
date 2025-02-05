@@ -40,7 +40,7 @@ class UserModel {
   factory UserModel.fromJson(Map<String, dynamic> json) {
     // Ensure uid is present
     if (!json.containsKey('uid')) {
-      throw FormatException('Missing uid in UserModel json');
+      throw const FormatException('Missing uid in UserModel json');
     }
     return _$UserModelFromJson(json);
   }
