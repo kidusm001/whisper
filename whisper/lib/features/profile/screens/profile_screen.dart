@@ -1,3 +1,5 @@
+// ignore_for_file: unused_element
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,6 +12,7 @@ import '../../models/subscription_model.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
+import 'package:whisper/features/profile/screens/create_post_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -371,11 +374,10 @@ class _ProfileScreenState extends State<ProfileScreen>
           return const Center(child: CircularProgressIndicator());
         }
 
-        final posts = snapshot.data?.docs
+        final posts = snapshot.data!.docs
                 .map((doc) =>
                     PostModel.fromJson(doc.data() as Map<String, dynamic>))
-                .toList() ??
-            [];
+                .toList();
 
         if (posts.isEmpty) {
           return Center(
@@ -743,16 +745,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     _bioController.dispose();
     _tabController.dispose();
     super.dispose();
-  }
-}
-
-class CreatePostScreen extends StatelessWidget {
-  const CreatePostScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    // TODO: Implement CreatePostScreen
-    return Container();
   }
 }
 
