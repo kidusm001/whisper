@@ -2,11 +2,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import '../../models/user_model.dart';
 import '../../models/post_model.dart';
 import '../../models/subscription_model.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -15,18 +18,24 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
+class _ProfileScreenState extends State<ProfileScreen>
+    with SingleTickerProviderStateMixin {
   final _nameController = TextEditingController();
   final _bioController = TextEditingController();
   bool _isEditing = false;
   bool _isLoading = false;
   late TabController _tabController;
-  final _imagePicker = ImagePicker();
+
+  // Platform-specific image storage
+  File? _profileImage;
+  File? _coverImage;
+  Uint8List? _profileImageWeb;
+  Uint8List? _coverImageWeb;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
@@ -38,202 +47,299 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       );
     }
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          StreamBuilder<DocumentSnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('users')
-                .doc(currentUser.uid)
-                .snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return const Center(child: Text('Something went wrong'));
-              }
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Scaffold(
+            body: Center(child: Text('Error: ${snapshot.error}')),
+          );
+        }
 
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
 
-              if (!snapshot.hasData || !snapshot.data!.exists) {
-                // Create a new user document if it doesn't exist
-                _createUserDocument(currentUser);
-                return const Center(child: CircularProgressIndicator());
-              }
+        final userData = snapshot.data!.data() as Map<String, dynamic>;
+        final user = UserModel.fromJson(userData);
 
-              final userData = snapshot.data!.data() as Map<String, dynamic>;
-              userData['uid'] = currentUser.uid; // Add uid to the data
-              
-              final user = UserModel.fromJson(userData);
-
-              return NestedScrollView(
-                headerSliverBuilder: (context, innerBoxIsScrolled) => [
-                  SliverAppBar(
-                    expandedHeight: 200,
-                    floating: false,
-                    pinned: true,
-                    backgroundColor: Colors.white,
-                    elevation: 0,
-                    flexibleSpace: FlexibleSpaceBar(
-                      background: Stack(
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              image: user.coverImage != null
-                                  ? DecorationImage(
-                                      image: NetworkImage(user.coverImage!),
-                                      fit: BoxFit.cover,
-                                    )
-                                  : null,
-                            ),
-                          ),
-                          if (_isEditing)
-                            Positioned(
-                              right: 16,
-                              bottom: 16,
-                              child: ElevatedButton(
-                                onPressed: _updateCoverImage,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.black.withOpacity(0.7),
-                                ),
-                                child: const Text('Change Cover'),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    actions: [
-                      if (!_isEditing)
-                        TextButton(
-                          onPressed: () => setState(() => _isEditing = true),
-                          child: const Text(
-                            'Edit Profile',
-                            style: TextStyle(color: Color(0xFF320064)),
-                          ),
-                        )
-                      else
-                        TextButton(
-                          onPressed: () => _saveProfile(user),
-                          child: const Text(
-                            'Save',
-                            style: TextStyle(color: Color(0xFF320064)),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-                body: Column(
-                  children: [
-                    Transform.translate(
-                      offset: const Offset(0, -40),
-                      child: _buildProfileHeader(user),
-                    ),
-                    TabBar(
-                      controller: _tabController,
-                      labelColor: Colors.black,
-                      tabs: const [
-                        Tab(text: 'Posts'),
-                        Tab(text: 'About'),
-                        Tab(text: 'Subscriptions'),
-                      ],
-                    ),
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildPostsTab(user.uid),
-                          _buildAboutTab(user),
-                          _buildSubscriptionsTab(user.uid),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+        return Scaffold(
+          backgroundColor: Colors.grey[50],
+          floatingActionButton: FloatingActionButton(
+            backgroundColor: const Color(0xFF320064),
+            foregroundColor: Colors.white,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const CreatePostScreen()),
               );
             },
+            child: const Icon(Icons.add),
           ),
-          if (_isLoading)
-            Container(
-              color: Colors.black26,
-              child: const Center(
-                child: CircularProgressIndicator(),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProfileHeader(UserModel user) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: [
-          Stack(
+          body: Stack(
+            clipBehavior: Clip.none,
             children: [
-              CircleAvatar(
-                radius: 50,
-                backgroundColor: Colors.grey[200],
-                backgroundImage: user.photoUrl != null
-                    ? NetworkImage(user.photoUrl!)
-                    : null,
-                child: user.photoUrl == null
-                    ? const Icon(Icons.person, size: 50, color: Colors.grey)
-                    : null,
+              // Main Scrollable Content
+              CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Column(
+                      children: [
+                        // Cover Image
+                        Container(
+                          height: 200,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            image: user.coverImage != null
+                                ? DecorationImage(
+                                    image: NetworkImage(user.coverImage!),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
+                          ),
+                          child: _isEditing
+                              ? Align(
+                                  alignment: Alignment.bottomRight,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: ElevatedButton(
+                                      onPressed: _updateCoverImage,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            Colors.black.withOpacity(0.7),
+                                      ),
+                                      child: const Text('Change Cover'),
+                                    ),
+                                  ),
+                                )
+                              : null,
+                        ),
+
+                        // Profile Avatar (inside Column, so it scrolls)
+                        Stack(
+                          clipBehavior: Clip.none,
+                          alignment: Alignment.center,
+                          children: [
+                            Container(
+                              margin: const EdgeInsets.only(top: 20),
+                              child: CircleAvatar(
+                                radius: 50,
+                                backgroundColor: Colors.grey[200],
+                                backgroundImage: user.photoUrl != null
+                                    ? NetworkImage(user.photoUrl!)
+                                    : null,
+                                child: user.photoUrl == null
+                                    ? const Icon(Icons.person,
+                                        size: 50, color: Colors.grey)
+                                    : null,
+                              ),
+                            ),
+                            if (_isEditing)
+                              Positioned(
+                                right: 0,
+                                bottom: 0,
+                                child: CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: const Color(0xFF320064),
+                                  child: IconButton(
+                                    icon: const Icon(Icons.camera_alt, size: 18),
+                                    color: Colors.white,
+                                    onPressed: _updateProfileImage,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        // Profile Info (Name and Bio)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Column(
+                            children: [
+                              if (_isEditing) ...[
+                                TextField(
+                                  controller: _nameController,
+                                  textAlign: TextAlign.center,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Name',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextField(
+                                  controller: _bioController,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 3,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Bio',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                              ] else ...[
+                                Text(
+                                  user.displayName ?? 'Add your name',
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                if (user.bio != null) ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    user.bio!,
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 16,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ],
+                              const SizedBox(height: 24),
+                              // Stats Row
+                              Container(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.grey.withOpacity(0.1),
+                                      spreadRadius: 1,
+                                      blurRadius: 5,
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    _buildStatItem('Posts', user.postsCount),
+                                    _buildStatItem(
+                                        'Followers', user.followersCount),
+                                    _buildStatItem(
+                                        'Following', user.followingCount),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        // Tabs
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.1),
+                                spreadRadius: 1,
+                                blurRadius: 5,
+                              ),
+                            ],
+                          ),
+                          child: TabBar(
+                            controller: _tabController,
+                            labelColor: const Color(0xFF320064),
+                            unselectedLabelColor: Colors.grey,
+                            indicatorColor: const Color(0xFF320064),
+                            tabs: const [
+                              Tab(text: 'Posts'),
+                              Tab(text: 'Subscriptions'),
+                            ],
+                          ),
+                        ),
+                        SizedBox(
+                          height: MediaQuery.of(context).size.height - 450,
+                          child: TabBarView(
+                            controller: _tabController,
+                            children: [
+                              _buildPostsTab(user.uid),
+                              _buildSubscriptionsTab(user.uid),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              if (_isEditing)
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: CircleAvatar(
-                    radius: 18,
-                    backgroundColor: const Color(0xFF320064),
-                    child: IconButton(
-                      icon: const Icon(Icons.camera_alt, size: 18),
-                      color: Colors.white,
-                      onPressed: _updateProfileImage,
+
+              // Navigation Buttons (top layer)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  color: Colors.transparent, // Make it transparent
+                  padding: EdgeInsets.only(
+                    top: MediaQuery.of(context).padding.top + 10,
+                    left: 10,
+                    right: 10,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Material(
+                        color: Colors.transparent,
+                        child: IconButton(
+                          icon: const Icon(Icons.arrow_back,
+                              color: Colors
+                                  .white), // Keep white for visibility on cover
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ),
+                      Material(
+                        color: Colors.transparent,
+                        child: _isEditing
+                            ? ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                      Colors.black.withOpacity(0.7),
+                                ),
+                                onPressed: () => _saveProfile(user),
+                                child: const Text('Save',
+                                    style: TextStyle(color: Colors.white)),
+                              )
+                            : IconButton(
+                                icon: const Icon(Icons.edit,
+                                    color: Colors
+                                        .white), // Keep white for visibility
+                                onPressed: () {
+                                  setState(() {
+                                    _isEditing = true;
+                                    _nameController.text = user.displayName ?? '';
+                                    _bioController.text = user.bio ?? '';
+                                  });
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Loading Overlay
+              if (_isLoading)
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black26,
+                    child: const Center(
+                      child: CircularProgressIndicator(),
                     ),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 16),
-          if (_isEditing) ...[
-            TextField(
-              controller: _nameController..text = user.displayName ?? '',
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _bioController..text = user.bio ?? '',
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Bio',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ] else ...[
-            Text(
-              user.displayName ?? 'Add your name',
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            if (user.bio != null)
-              Text(
-                user.bio!,
-                style: TextStyle(color: Colors.grey[600]),
-                textAlign: TextAlign.center,
-              ),
-          ],
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -246,7 +352,19 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return const Center(child: Text('Error loading posts'));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('Error loading posts'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => setState(() {}),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -254,11 +372,39 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         }
 
         final posts = snapshot.data?.docs
-            .map((doc) => PostModel.fromJson(doc.data() as Map<String, dynamic>))
-            .toList() ?? [];
+                .map((doc) =>
+                    PostModel.fromJson(doc.data() as Map<String, dynamic>))
+                .toList() ??
+            [];
 
         if (posts.isEmpty) {
-          return const Center(child: Text('No posts yet'));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('Share your first post with your followers!'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF320064),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const CreatePostScreen()),
+                    );
+                  },
+                  child: const Text(
+                    'Create Post',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          );
         }
 
         return ListView.builder(
@@ -316,33 +462,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
   }
 
-  Widget _buildAboutTab(UserModel user) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Stats',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatItem('Posts', user.postsCount),
-              _buildStatItem('Followers', user.followersCount),
-              _buildStatItem('Following', user.followingCount),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSubscriptionsTab(String userId) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -360,8 +479,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         }
 
         final subscriptions = snapshot.data?.docs
-            .map((doc) => SubscriptionModel.fromJson(doc.data() as Map<String, dynamic>))
-            .toList() ?? [];
+                .map((doc) => SubscriptionModel.fromJson(
+                    doc.data() as Map<String, dynamic>))
+                .toList() ??
+            [];
 
         if (subscriptions.isEmpty) {
           return const Center(child: Text('No active subscriptions'));
@@ -370,7 +491,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: subscriptions.length,
-          itemBuilder: (context, index) => _buildSubscriptionCard(subscriptions[index]),
+          itemBuilder: (context, index) =>
+              _buildSubscriptionCard(subscriptions[index]),
         );
       },
     );
@@ -399,7 +521,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   : null,
             ),
             title: Text(creator.displayName ?? 'Unknown Creator'),
-            subtitle: Text('Subscribed since: ${_formatDate(subscription.startDate)}'),
+            subtitle: Text(
+                'Subscribed since: ${_formatDate(subscription.startDate)}'),
             trailing: Text('\$${subscription.amount}/month'),
           ),
         );
@@ -431,87 +554,140 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     return '${date.day}/${date.month}/${date.year}';
   }
 
-  Future<void> _updateProfileImage() async {
-    setState(() => _isLoading = true);
-    try {
-      final XFile? image = await _imagePicker.pickImage(source: ImageSource.gallery);
-      if (image != null) {
-        final storageRef = FirebaseStorage.instance
-            .ref()
-            .child('user_images')
-            .child('${FirebaseAuth.instance.currentUser!.uid}_profile.jpg');
-
-        final uploadTask = await storageRef.putFile(File(image.path));
-        final downloadUrl = await uploadTask.ref.getDownloadURL();
-
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(FirebaseAuth.instance.currentUser!.uid)
-            .update({
-          'photoUrl': downloadUrl,
+  Future<void> _pickImage(ImageSource source, String type) async {
+    final pickedFile = await ImagePicker().pickImage(source: source);
+    if (pickedFile != null) {
+      if (kIsWeb) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          if (type == 'profile') {
+            _profileImageWeb = bytes;
+            _profileImage = null; // Clear other format
+          } else {
+            _coverImageWeb = bytes;
+            _coverImage = null; // Clear other format
+          }
+        });
+      } else {
+        setState(() {
+          if (type == 'profile') {
+            _profileImage = File(pickedFile.path);
+            _profileImageWeb = null; // Clear other format
+          } else {
+            _coverImage = File(pickedFile.path);
+            _coverImageWeb = null; // Clear other format
+          }
         });
       }
+    }
+  }
+
+  Future<String?> _uploadImageToSupabase(
+      dynamic imageFile, String imageType, String userId) async {
+    if (imageFile == null) return null;
+
+    final supabaseClient = supabase.Supabase.instance.client;
+    final fileName =
+        '${userId}_${imageType}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final imagePath = '$userId/$imageType/$fileName';
+
+    try {
+      if (imageFile is Uint8List) {
+        await supabaseClient.storage.from('images').uploadBinary(
+              imagePath,
+              imageFile,
+              fileOptions: const supabase.FileOptions(
+                  cacheControl: '3600', upsert: false),
+            );
+      } else if (imageFile is File) {
+        await supabaseClient.storage.from('images').upload(
+              imagePath,
+              imageFile,
+              fileOptions: const supabase.FileOptions(
+                  cacheControl: '3600', upsert: false),
+            );
+      } else {
+        throw Exception('Unsupported image file type');
+      }
+
+      final publicUrl =
+          supabaseClient.storage.from('images').getPublicUrl(imagePath);
+      return publicUrl;
     } catch (e) {
+      debugPrint('Error uploading image: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update profile image')),
+          SnackBar(content: Text('Error uploading image: $e')),
         );
       }
-    } finally {
-      setState(() => _isLoading = false);
+      return null;
     }
+  }
+
+  Future<void> _updateProfileImage() async {
+    await _pickImage(ImageSource.gallery, 'profile');
+    await _saveProfile(null); // Pass current user model if needed
   }
 
   Future<void> _updateCoverImage() async {
-    setState(() => _isLoading = true);
-    try {
-      final XFile? image = await _imagePicker.pickImage(source: ImageSource.gallery);
-      if (image != null) {
-        final storageRef = FirebaseStorage.instance
-            .ref()
-            .child('user_images')
-            .child('${FirebaseAuth.instance.currentUser!.uid}_cover.jpg');
-
-        final uploadTask = await storageRef.putFile(File(image.path));
-        final downloadUrl = await uploadTask.ref.getDownloadURL();
-
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(FirebaseAuth.instance.currentUser!.uid)
-            .update({
-          'coverImage': downloadUrl,
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update cover image')),
-        );
-      }
-    } finally {
-      setState(() => _isLoading = false);
-    }
+    await _pickImage(ImageSource.gallery, 'cover');
+    await _saveProfile(null); // Pass current user model if needed
   }
 
-  Future<void> _saveProfile(UserModel currentUser) async {
+  Future<void> _saveProfile(UserModel? currentUser) async {
     setState(() => _isLoading = true);
 
     try {
-      final updatedUser = currentUser.copyWith(
-        displayName: _nameController.text,
-        bio: _bioController.text,
-      );
+      final user = FirebaseAuth.instance.currentUser!;
+      Map<String, dynamic> updates = {};
 
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .update(updatedUser.toJson());
+      // Handle profile image upload
+      if (kIsWeb && _profileImageWeb != null) {
+        final profileUrl =
+            await _uploadImageToSupabase(_profileImageWeb, 'profile', user.uid);
+        if (profileUrl != null) updates['photoUrl'] = profileUrl;
+      } else if (!kIsWeb && _profileImage != null) {
+        final profileUrl =
+            await _uploadImageToSupabase(_profileImage, 'profile', user.uid);
+        if (profileUrl != null) updates['photoUrl'] = profileUrl;
+      }
 
-      setState(() => _isEditing = false);
+      // Handle cover image upload
+      if (kIsWeb && _coverImageWeb != null) {
+        final coverUrl =
+            await _uploadImageToSupabase(_coverImageWeb, 'cover', user.uid);
+        if (coverUrl != null) updates['coverImage'] = coverUrl;
+      } else if (!kIsWeb && _coverImage != null) {
+        final coverUrl =
+            await _uploadImageToSupabase(_coverImage, 'cover', user.uid);
+        if (coverUrl != null) updates['coverImage'] = coverUrl;
+      }
+
+      // Add other profile updates if in editing mode
+      if (_isEditing) {
+        updates['displayName'] = _nameController.text.trim();
+        updates['bio'] = _bioController.text.trim();
+      }
+
+      if (updates.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update(updates);
+      }
+
+      setState(() {
+        _isEditing = false;
+        // Clear image buffers after successful upload
+        _profileImage = null;
+        _coverImage = null;
+        _profileImageWeb = null;
+        _coverImageWeb = null;
+      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update profile')),
+          SnackBar(content: Text('Failed to update profile: $e')),
         );
       }
     } finally {
@@ -530,6 +706,32 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         'followersCount': 0,
         'followingCount': 0,
       });
+
+      // If the user has a photoURL (e.g., from Google Sign-In), upload it to Supabase
+      if (user.photoURL != null && user.photoURL!.isNotEmpty) {
+        // Download the image from the URL
+        final response = await http.get(Uri.parse(user.photoURL!));
+        if (response.statusCode == 200) {
+          // Create a temporary file
+          final tempDir = await getTemporaryDirectory();
+          final tempFile = File('${tempDir.path}/temp_profile_image.jpg');
+          await tempFile.writeAsBytes(response.bodyBytes);
+
+          // Upload the image to Supabase
+          final imageUrl =
+              await _uploadImageToSupabase(tempFile, 'profile', user.uid);
+
+          // Update the Firestore document with the Supabase URL
+          if (imageUrl != null) {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .update({'photoUrl': imageUrl});
+          }
+          // Delete the temporary file
+          await tempFile.delete();
+        }
+      }
     } catch (e) {
       debugPrint('Error creating user document: $e');
     }
@@ -542,4 +744,39 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     _tabController.dispose();
     super.dispose();
   }
-} 
+}
+
+class CreatePostScreen extends StatelessWidget {
+  const CreatePostScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // TODO: Implement CreatePostScreen
+    return Container();
+  }
+}
+
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  _SliverAppBarDelegate(this._tabBar);
+
+  final TabBar _tabBar;
+
+  @override
+  double get minExtent => _tabBar.preferredSize.height;
+  @override
+  double get maxExtent => _tabBar.preferredSize.height;
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: Colors.white,
+      child: _tabBar,
+    );
+  }
+
+  @override
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
+    return false;
+  }
+}

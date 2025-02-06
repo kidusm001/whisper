@@ -69,7 +69,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         'Password',
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                             color: Colors.white.withOpacity(0.7),
                           ),
                           onPressed: () {
@@ -82,10 +84,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       obscureText: _obscurePassword,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Please enter a password';
-                        }
-                        if (value.length < 6) {
-                          return 'Password must be at least 6 characters';
+                          return 'Please enter your password';
                         }
                         return null;
                       },
@@ -98,12 +97,15 @@ class _SignupScreenState extends State<SignupScreen> {
                         'Confirm Password',
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                            _obscureConfirmPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                             color: Colors.white.withOpacity(0.7),
                           ),
                           onPressed: () {
                             setState(() {
-                              _obscureConfirmPassword = !_obscureConfirmPassword;
+                              _obscureConfirmPassword =
+                                  !_obscureConfirmPassword;
                             });
                           },
                         ),
@@ -119,7 +121,8 @@ class _SignupScreenState extends State<SignupScreen> {
                     const SizedBox(height: 32),
                     if (_isLoading)
                       const CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF320064)),
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Color(0xFF320064)),
                       )
                     else
                       SizedBox(
@@ -188,12 +191,16 @@ class _SignupScreenState extends State<SignupScreen> {
     });
 
     try {
-      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      final userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
-      await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .set({
         'uid': userCredential.user!.uid,
         'email': userCredential.user!.email,
         'createdAt': FieldValue.serverTimestamp(),
@@ -204,7 +211,7 @@ class _SignupScreenState extends State<SignupScreen> {
       });
 
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/role_selection');
+        Navigator.pushNamed(context, '/profile-setup');
       }
     } on FirebaseAuthException catch (e) {
       String message = 'An error occurred';
@@ -234,4 +241,4 @@ class _SignupScreenState extends State<SignupScreen> {
     _confirmPasswordController.dispose();
     super.dispose();
   }
-} 
+}
