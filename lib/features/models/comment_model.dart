@@ -1,5 +1,9 @@
-import 'package:json_annotation/json_annotation.dart';
+// File: comment_model.dart
+// Description: Model for post comments
+
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:json_annotation/json_annotation.dart';
 
 part 'comment_model.g.dart';
 
@@ -10,8 +14,6 @@ class CommentModel {
   final String authorId;
   final String content;
   final int likesCount;
-  
-  @JsonKey(fromJson: _timestampFromJson, toJson: _timestampToJson)
   final DateTime createdAt;
 
   CommentModel({
@@ -23,16 +25,12 @@ class CommentModel {
     required this.createdAt,
   });
 
-  factory CommentModel.fromJson(Map<String, dynamic> json) => 
+  factory CommentModel.fromJson(Map<String, dynamic> json) =>
       _$CommentModelFromJson(json);
 
   Map<String, dynamic> toJson() => _$CommentModelToJson(this);
 
-  static DateTime _timestampFromJson(Timestamp timestamp) {
-    return timestamp.toDate();
-  }
-
-  static Timestamp _timestampToJson(DateTime date) {
-    return Timestamp.fromDate(date);
-  }
-} 
+  static DateTime _timestampFromJson(Timestamp timestamp) => timestamp.toDate();
+  static Timestamp _timestampToJson(DateTime dateTime) =>
+      Timestamp.fromDate(dateTime);
+}

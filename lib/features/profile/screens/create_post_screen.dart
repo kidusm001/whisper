@@ -6,6 +6,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_auth/firebase_auth.dart';
 
+export 'create_post_screen.dart' show CreatePostScreen;
+
 class CreatePostScreen extends StatefulWidget {
   const CreatePostScreen({super.key});
 
@@ -51,7 +53,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You must be logged in to create a post.')),
+        const SnackBar(
+            content: Text('You must be logged in to create a post.')),
       );
       return;
     }
@@ -59,21 +62,24 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Create Post'),
-        backgroundColor: const Color(0xFF320064),
-        foregroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
         actions: [
           TextButton(
             onPressed: _createPost,
-            child: const Text(
+            child: Text(
               'Post',
-              style: TextStyle(color: Colors.white, fontSize: 16),
+              style:
+                  TextStyle(color: theme.colorScheme.onPrimary, fontSize: 16),
             ),
           ),
         ],
       ),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -84,14 +90,16 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 children: [
                   CircleAvatar(
                     radius: 20,
-                    backgroundColor: Colors.grey[300],
+                    backgroundColor: theme.colorScheme.surface,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: TextField(
                       controller: _titleController,
-                      decoration: const InputDecoration(
+                      style: theme.textTheme.bodyLarge,
+                      decoration: InputDecoration(
                         hintText: 'Title',
+                        hintStyle: TextStyle(color: theme.hintColor),
                         border: InputBorder.none,
                       ),
                     ),
@@ -101,8 +109,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               const SizedBox(height: 10),
               TextField(
                 controller: _contentController,
-                decoration: const InputDecoration(
+                style: theme.textTheme.bodyLarge,
+                decoration: InputDecoration(
                   hintText: 'Write a caption...',
+                  hintStyle: TextStyle(color: theme.hintColor),
                   border: InputBorder.none,
                 ),
                 maxLines: null,
@@ -115,30 +125,38 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   height: 200,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    color: Colors.grey[200],
+                    color: theme.colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                     image: (_image != null || _imageWeb != null)
                         ? DecorationImage(
                             image: kIsWeb
-                                ? MemoryImage(_imageWeb!) as ImageProvider<Object>
+                                ? MemoryImage(_imageWeb!)
+                                    as ImageProvider<Object>
                                 : FileImage(_image!) as ImageProvider<Object>,
                             fit: BoxFit.cover,
                           )
                         : null,
                   ),
                   child: (_image == null && _imageWeb == null)
-                      ? const Icon(Icons.add_a_photo, size: 50, color: Colors.grey)
+                      ? Icon(Icons.add_a_photo,
+                          size: 50, color: theme.hintColor)
                       : null,
                 ),
               ),
               const SizedBox(height: 20),
               DropdownButtonFormField<String>(
                 value: _selectedTier,
+                style: theme.textTheme.bodyLarge,
+                dropdownColor: theme.cardColor,
                 decoration: InputDecoration(
                   labelText: 'Select Tier (Optional)',
+                  labelStyle: TextStyle(color: theme.hintColor),
                   border: const OutlineInputBorder(),
                   focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.grey[600]!),
+                    borderSide: BorderSide(color: theme.colorScheme.primary),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: theme.dividerColor),
                   ),
                 ),
                 items: _availableTiers.map((String tier) {
@@ -158,11 +176,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 children: [
                   Text(
                     'Publish Post',
-                    style: TextStyle(color: Colors.grey[700]),
+                    style: theme.textTheme.bodyLarge,
                   ),
                   Switch(
                     value: _isPublished,
-                    activeColor: const Color(0xFF320064),
+                    activeColor: theme.colorScheme.primary,
                     onChanged: (value) {
                       setState(() {
                         _isPublished = value;

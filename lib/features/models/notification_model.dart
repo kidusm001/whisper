@@ -39,4 +39,4 @@ class NotificationModel {
   static Timestamp _timestampToJson(DateTime date) {
     return Timestamp.fromDate(date);
   }
-} 
+}

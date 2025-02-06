@@ -63,7 +63,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         'Password',
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                            _obscurePassword
+                                ? Icons.visibility
+                                : Icons.visibility_off,
                             color: Colors.white.withOpacity(0.7),
                           ),
                           onPressed: () {
@@ -84,7 +86,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 32),
                     if (_isLoading)
                       const CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF320064)),
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Color(0xFF320064)),
                       )
                     else
                       SizedBox(
@@ -157,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/home');
+        Navigator.pushReplacementNamed(context, '/main-navigation');
       }
     } on FirebaseAuthException catch (e) {
       String message = 'An error occurred';
@@ -186,4 +189,4 @@ class _LoginScreenState extends State<LoginScreen> {
     _passwordController.dispose();
     super.dispose();
   }
-} 
+}

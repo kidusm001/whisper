@@ -43,6 +43,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
       return const Scaffold(
@@ -72,7 +73,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         final user = UserModel.fromJson(userData);
 
         return Scaffold(
-          backgroundColor: Colors.grey[50],
+          backgroundColor: theme.scaffoldBackgroundColor,
           floatingActionButton: FloatingActionButton(
             backgroundColor: const Color(0xFF320064),
             foregroundColor: Colors.white,
@@ -98,7 +99,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         Container(
                           height: 200,
                           decoration: BoxDecoration(
-                            color: Colors.grey[200],
+                            color: theme.colorScheme.surface,
                             image: user.coverImage != null
                                 ? DecorationImage(
                                     image: NetworkImage(user.coverImage!),
@@ -115,7 +116,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                                       onPressed: _updateCoverImage,
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor:
-                                            Colors.black.withOpacity(0.7),
+                                            theme.colorScheme.primary,
+                                        foregroundColor:
+                                            theme.colorScheme.onPrimary,
                                       ),
                                       child: const Text('Change Cover'),
                                     ),
@@ -124,7 +127,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                               : null,
                         ),
 
-                        // Profile Avatar (inside Column, so it scrolls)
+                        // Profile Avatar
                         Stack(
                           clipBehavior: Clip.none,
                           alignment: Alignment.center,
@@ -133,13 +136,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                               margin: const EdgeInsets.only(top: 20),
                               child: CircleAvatar(
                                 radius: 50,
-                                backgroundColor: Colors.grey[200],
+                                backgroundColor: theme.colorScheme.surface,
                                 backgroundImage: user.photoUrl != null
                                     ? NetworkImage(user.photoUrl!)
                                     : null,
                                 child: user.photoUrl == null
-                                    ? const Icon(Icons.person,
-                                        size: 50, color: Colors.grey)
+                                    ? Icon(Icons.person,
+                                        size: 50, color: theme.hintColor)
                                     : null,
                               ),
                             ),
@@ -149,10 +152,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 bottom: 0,
                                 child: CircleAvatar(
                                   radius: 18,
-                                  backgroundColor: const Color(0xFF320064),
+                                  backgroundColor: theme.colorScheme.primary,
                                   child: IconButton(
-                                    icon: const Icon(Icons.camera_alt, size: 18),
-                                    color: Colors.white,
+                                    icon:
+                                        const Icon(Icons.camera_alt, size: 18),
+                                    color: theme.colorScheme.onPrimary,
                                     onPressed: _updateProfileImage,
                                   ),
                                 ),
@@ -160,7 +164,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ],
                         ),
                         const SizedBox(height: 24),
-                        // Profile Info (Name and Bio)
+                        // Profile Info
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 24),
                           child: Column(
@@ -169,26 +173,32 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 TextField(
                                   controller: _nameController,
                                   textAlign: TextAlign.center,
-                                  decoration: const InputDecoration(
+                                  style: theme.textTheme.bodyLarge,
+                                  decoration: InputDecoration(
                                     labelText: 'Name',
-                                    border: OutlineInputBorder(),
+                                    border: const OutlineInputBorder(),
+                                    labelStyle:
+                                        TextStyle(color: theme.hintColor),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
                                 TextField(
                                   controller: _bioController,
                                   textAlign: TextAlign.center,
+                                  style: theme.textTheme.bodyLarge,
                                   maxLines: 3,
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     labelText: 'Bio',
-                                    border: OutlineInputBorder(),
+                                    border: const OutlineInputBorder(),
+                                    labelStyle:
+                                        TextStyle(color: theme.hintColor),
                                   ),
                                 ),
                               ] else ...[
                                 Text(
                                   user.displayName ?? 'Add your name',
-                                  style: const TextStyle(
-                                    fontSize: 24,
+                                  style:
+                                      theme.textTheme.headlineMedium?.copyWith(
                                     fontWeight: FontWeight.bold,
                                   ),
                                   textAlign: TextAlign.center,
@@ -197,9 +207,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   const SizedBox(height: 8),
                                   Text(
                                     user.bio!,
-                                    style: TextStyle(
-                                      color: Colors.grey[600],
-                                      fontSize: 16,
+                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                      color: theme.hintColor,
                                     ),
                                     textAlign: TextAlign.center,
                                   ),
@@ -211,11 +220,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 16),
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                  color: theme.cardColor,
                                   borderRadius: BorderRadius.circular(12),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.grey.withOpacity(0.1),
+                                      color: theme.shadowColor.withOpacity(0.1),
                                       spreadRadius: 1,
                                       blurRadius: 5,
                                     ),
@@ -294,9 +303,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                       Material(
                         color: Colors.transparent,
                         child: IconButton(
-                          icon: const Icon(Icons.arrow_back,
-                              color: Colors
-                                  .white), // Keep white for visibility on cover
+                          icon: Icon(Icons.arrow_back,
+                              color: Theme.of(context).brightness == Brightness.light
+                                  ? Colors.black
+                                  : Colors.white),
                           onPressed: () => Navigator.of(context).pop(),
                         ),
                       ),
@@ -313,13 +323,15 @@ class _ProfileScreenState extends State<ProfileScreen>
                                     style: TextStyle(color: Colors.white)),
                               )
                             : IconButton(
-                                icon: const Icon(Icons.edit,
-                                    color: Colors
-                                        .white), // Keep white for visibility
+                                icon: Icon(Icons.edit,
+                                    color: Theme.of(context).brightness == Brightness.light
+                                        ? Colors.black
+                                        : Colors.white),
                                 onPressed: () {
                                   setState(() {
                                     _isEditing = true;
-                                    _nameController.text = user.displayName ?? '';
+                                    _nameController.text =
+                                        user.displayName ?? '';
                                     _bioController.text = user.bio ?? '';
                                   });
                                 },
@@ -375,9 +387,9 @@ class _ProfileScreenState extends State<ProfileScreen>
         }
 
         final posts = snapshot.data!.docs
-                .map((doc) =>
-                    PostModel.fromJson(doc.data() as Map<String, dynamic>))
-                .toList();
+            .map(
+                (doc) => PostModel.fromJson(doc.data() as Map<String, dynamic>))
+            .toList();
 
         if (posts.isEmpty) {
           return Center(
