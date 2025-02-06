@@ -5,9 +5,16 @@ import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/signup_screen.dart';
 import 'screen/home_screen.dart';
 import 'features/profile/screens/profile_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'screen/profile_setup_screen.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: 'https://ljwwgbouaqnejyatmkye.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxqd3dnYm91YXFuZWp5YXRta3llIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg3OTY4NzcsImV4cCI6MjA1NDM3Mjg3N30.j2cj4kDZj53exoS2bVmb36IQgWnmSNAPtlyH2f_nk7k',
+  );
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -30,6 +37,7 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignupScreen(),
         '/home': (context) => const HomeScreen(),
+        '/profile-setup': (context) => const ProfileSetupScreen(),
         '/profile': (context) => const ProfileScreen(),
       },
     );
