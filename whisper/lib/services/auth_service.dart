@@ -1,47 +1,51 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../data/repositories/user_repository.dart';
+import '../data/models/user_model.dart';
+
+part 'auth_service.g.dart';
 
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseAuth _auth;
+  final UserRepository _userRepository;
 
-  // Sign up method with error handling.
-  Future<UserCredential?> signUp(String email, String password) async {
-    try {
-      return await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-    } on FirebaseAuthException catch (e) {
-      print('FirebaseAuthException in signUp: ${e.code} - ${e.message}');
-      return null;
-    } catch (e) {
-      print('Error in signUp: $e');
-      return null;
-    }
+  AuthService(this._auth, this._userRepository);
+
+  Stream<User?> get authStateChanges => _auth.authStateChanges();
+
+  Future<AppUser> signUpWithEmail({
+    required String email,
+    required String password,
+    required String displayName,
+  }) async {
+    final credential = await _auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+
+    final user = AppUser(
+      uid: credential.user!.uid,
+      email: email,
+      displayName: displayName,
+      joinDate: DateTime.now(),
+    );
+
+    await _userRepository.updateUser(user);
+    return user;
   }
 
-  Future<UserCredential?> login(String email, String password) async {
-    try {
-      return await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-    } on FirebaseAuthException catch (e) {
-      print('FirebaseAuthException in login: ${e.code} - ${e.message}');
-      return null;
-    } catch (e) {
-      print('Error in login: $e');
-      return null;
-    }
-  }
+  Future<void> signOut() async => await _auth.signOut();
 
-  // Logout method with error handling.
-  Future<bool> logout() async {
-    try {
-      await _auth.signOut();
-      return true;
-    } catch (e) {
-      print('Error in logout: $e');
-      return false;
-    }
+  Future<void> updateProfileImage(String uid, String url) async {
+    await _userRepository.updateUser(
+        (await _userRepository.getUser(uid)).copyWith(profileImageUrl: url));
   }
+}
+
+@riverpod
+AuthService authService(AuthServiceRef ref) {
+  return AuthService(
+    FirebaseAuth.instance,
+    ref.read(userRepositoryProvider),
+  );
 }

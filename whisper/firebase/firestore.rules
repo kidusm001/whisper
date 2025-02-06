@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Original rules for user documents.
+    function isCreator() {
+      return request.auth.token.role == 'creator';
+    }
+    
+    function getUserTier() {
+      return request.auth.token.tier ? request.auth.token.tier : 0;
+    }
+
+    match /users/{userId} {
+      allow read: if request.auth.uid == userId;
+      allow update: if request.auth.uid == userId && 
+        request.resource.data.keys().hasAll([
+          'email', 'displayName', 'profileImageUrl', 'socialLinks'
+        ]);
+      
+      match /content/{contentId} {
+        allow write: if isCreator();
+      }
+    }
+
+    // New standalone rules for content.
+    function getTier() {
+      return request.auth.token.tier ? request.auth.token.tier : 'generalAdmission';
+    }
+
+    match /content/{contentId} {
+      allow read: if resource.data.tierAccess[getTier()] == true;
+      allow write: if request.auth != null && 
+                   request.auth.uid == resource.data.creatorId;
+      
+      match /views/{viewId} {
+        allow create: if request.auth != null;
+      }
+    }
+    match /subscriptions/{subscriptionId} {
+      allow read: if request.auth != null && 
+                  request.auth.uid == resource.data.userId;
+      
+      allow create: if request.auth != null &&
+                  request.resource.data.userId == request.auth.uid;
+      
+      allow update: if request.auth != null &&
+                  resource.data.userId == request.auth.uid &&
+                  request.resource.data.userId == resource.data.userId;
+    }
+    match /tiers/{tier} {
+    allow read: if true;
+    allow write: if request.auth != null && 
+                request.auth.token.admin == true;
+  }
+  }
+}
