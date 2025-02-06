@@ -25,6 +25,7 @@ mixin _$SecretContent {
   ContentType get type => throw _privateConstructorUsedError;
   Map<SubscriptionTier, bool> get tierAccess =>
       throw _privateConstructorUsedError;
+  String? get textContent => throw _privateConstructorUsedError;
   String? get encryptedBody => throw _privateConstructorUsedError;
   String? get storagePath => throw _privateConstructorUsedError;
   String? get thumbnailPath => throw _privateConstructorUsedError;
@@ -65,6 +66,7 @@ abstract class $SecretContentCopyWith<$Res> {
       String creatorId,
       ContentType type,
       Map<SubscriptionTier, bool> tierAccess,
+      String? textContent,
       String? encryptedBody,
       String? storagePath,
       String? thumbnailPath,
@@ -104,6 +106,7 @@ class _$SecretContentCopyWithImpl<$Res, $Val extends SecretContent>
     Object? creatorId = null,
     Object? type = null,
     Object? tierAccess = null,
+    Object? textContent = freezed,
     Object? encryptedBody = freezed,
     Object? storagePath = freezed,
     Object? thumbnailPath = freezed,
@@ -140,6 +143,10 @@ class _$SecretContentCopyWithImpl<$Res, $Val extends SecretContent>
           ? _value.tierAccess
           : tierAccess // ignore: cast_nullable_to_non_nullable
               as Map<SubscriptionTier, bool>,
+      textContent: freezed == textContent
+          ? _value.textContent
+          : textContent // ignore: cast_nullable_to_non_nullable
+              as String?,
       encryptedBody: freezed == encryptedBody
           ? _value.encryptedBody
           : encryptedBody // ignore: cast_nullable_to_non_nullable
@@ -229,6 +236,7 @@ abstract class _$$SecretContentImplCopyWith<$Res>
       String creatorId,
       ContentType type,
       Map<SubscriptionTier, bool> tierAccess,
+      String? textContent,
       String? encryptedBody,
       String? storagePath,
       String? thumbnailPath,
@@ -266,6 +274,7 @@ class __$$SecretContentImplCopyWithImpl<$Res>
     Object? creatorId = null,
     Object? type = null,
     Object? tierAccess = null,
+    Object? textContent = freezed,
     Object? encryptedBody = freezed,
     Object? storagePath = freezed,
     Object? thumbnailPath = freezed,
@@ -302,6 +311,10 @@ class __$$SecretContentImplCopyWithImpl<$Res>
           ? _value._tierAccess
           : tierAccess // ignore: cast_nullable_to_non_nullable
               as Map<SubscriptionTier, bool>,
+      textContent: freezed == textContent
+          ? _value.textContent
+          : textContent // ignore: cast_nullable_to_non_nullable
+              as String?,
       encryptedBody: freezed == encryptedBody
           ? _value.encryptedBody
           : encryptedBody // ignore: cast_nullable_to_non_nullable
@@ -387,6 +400,7 @@ class _$SecretContentImpl extends _SecretContent with DiagnosticableTreeMixin {
       required this.creatorId,
       required this.type,
       required final Map<SubscriptionTier, bool> tierAccess,
+      this.textContent,
       this.encryptedBody,
       this.storagePath,
       this.thumbnailPath,
@@ -425,6 +439,8 @@ class _$SecretContentImpl extends _SecretContent with DiagnosticableTreeMixin {
     return EqualUnmodifiableMapView(_tierAccess);
   }
 
+  @override
+  final String? textContent;
   @override
   final String? encryptedBody;
   @override
@@ -469,7 +485,7 @@ class _$SecretContentImpl extends _SecretContent with DiagnosticableTreeMixin {
 
   @override
   String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) {
-    return 'SecretContent(contentId: $contentId, creatorId: $creatorId, type: $type, tierAccess: $tierAccess, encryptedBody: $encryptedBody, storagePath: $storagePath, thumbnailPath: $thumbnailPath, mimeType: $mimeType, fileSize: $fileSize, duration: $duration, waveformData: $waveformData, watermarkSeed: $watermarkSeed, encryptionKey: $encryptionKey, publishDate: $publishDate, expirationDate: $expirationDate, isEphemeral: $isEphemeral, isEncrypted: $isEncrypted, viewCount: $viewCount, unlockCount: $unlockCount, shareCount: $shareCount, deepLink: $deepLink, dimensions: $dimensions)';
+    return 'SecretContent(contentId: $contentId, creatorId: $creatorId, type: $type, tierAccess: $tierAccess, textContent: $textContent, encryptedBody: $encryptedBody, storagePath: $storagePath, thumbnailPath: $thumbnailPath, mimeType: $mimeType, fileSize: $fileSize, duration: $duration, waveformData: $waveformData, watermarkSeed: $watermarkSeed, encryptionKey: $encryptionKey, publishDate: $publishDate, expirationDate: $expirationDate, isEphemeral: $isEphemeral, isEncrypted: $isEncrypted, viewCount: $viewCount, unlockCount: $unlockCount, shareCount: $shareCount, deepLink: $deepLink, dimensions: $dimensions)';
   }
 
   @override
@@ -481,6 +497,7 @@ class _$SecretContentImpl extends _SecretContent with DiagnosticableTreeMixin {
       ..add(DiagnosticsProperty('creatorId', creatorId))
       ..add(DiagnosticsProperty('type', type))
       ..add(DiagnosticsProperty('tierAccess', tierAccess))
+      ..add(DiagnosticsProperty('textContent', textContent))
       ..add(DiagnosticsProperty('encryptedBody', encryptedBody))
       ..add(DiagnosticsProperty('storagePath', storagePath))
       ..add(DiagnosticsProperty('thumbnailPath', thumbnailPath))
@@ -513,6 +530,8 @@ class _$SecretContentImpl extends _SecretContent with DiagnosticableTreeMixin {
             (identical(other.type, type) || other.type == type) &&
             const DeepCollectionEquality()
                 .equals(other._tierAccess, _tierAccess) &&
+            (identical(other.textContent, textContent) ||
+                other.textContent == textContent) &&
             (identical(other.encryptedBody, encryptedBody) ||
                 other.encryptedBody == encryptedBody) &&
             (identical(other.storagePath, storagePath) ||
@@ -559,6 +578,7 @@ class _$SecretContentImpl extends _SecretContent with DiagnosticableTreeMixin {
         creatorId,
         type,
         const DeepCollectionEquality().hash(_tierAccess),
+        textContent,
         encryptedBody,
         storagePath,
         thumbnailPath,
@@ -601,6 +621,7 @@ abstract class _SecretContent extends SecretContent {
       required final String creatorId,
       required final ContentType type,
       required final Map<SubscriptionTier, bool> tierAccess,
+      final String? textContent,
       final String? encryptedBody,
       final String? storagePath,
       final String? thumbnailPath,
@@ -632,6 +653,8 @@ abstract class _SecretContent extends SecretContent {
   ContentType get type;
   @override
   Map<SubscriptionTier, bool> get tierAccess;
+  @override
+  String? get textContent;
   @override
   String? get encryptedBody;
   @override

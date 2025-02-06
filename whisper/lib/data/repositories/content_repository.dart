@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../models/content_model.dart';
+import '../models/user_model.dart';
 
 part 'content_repository.g.dart';
 
@@ -28,6 +29,18 @@ class ContentRepository {
         .map((snapshot) => snapshot.docs
             .map((doc) => SecretContent.fromFirestore(doc))
             .toList());
+  }
+
+  Future<List<SecretContent>> getContentForTier(SubscriptionTier tier) async {
+    final snapshot = await _firestore
+        .collection('content')
+        .where('tierAccess.${tier.name}', isEqualTo: true)
+        .orderBy('publishDate', descending: true)
+        .get();
+
+    return snapshot.docs
+        .map((doc) => SecretContent.fromFirestore(doc))
+        .toList();
   }
 
   Future<void> incrementViewCount(String contentId) async {

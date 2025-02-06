@@ -15,6 +15,7 @@ _$SecretContentImpl _$$SecretContentImplFromJson(Map<String, dynamic> json) =>
         (k, e) =>
             MapEntry($enumDecode(_$SubscriptionTierEnumMap, k), e as bool),
       ),
+      textContent: json['textContent'] as String?,
       encryptedBody: json['encryptedBody'] as String?,
       storagePath: json['storagePath'] as String?,
       thumbnailPath: json['thumbnailPath'] as String?,
@@ -48,6 +49,7 @@ Map<String, dynamic> _$$SecretContentImplToJson(_$SecretContentImpl instance) =>
       'type': _$ContentTypeEnumMap[instance.type]!,
       'tierAccess': instance.tierAccess
           .map((k, e) => MapEntry(_$SubscriptionTierEnumMap[k]!, e)),
+      'textContent': instance.textContent,
       'encryptedBody': instance.encryptedBody,
       'storagePath': instance.storagePath,
       'thumbnailPath': instance.thumbnailPath,

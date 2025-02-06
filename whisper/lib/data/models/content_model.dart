@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:flutter/foundation.dart';
+import 'user_model.dart'; // Import SubscriptionTier (and other shared definitions)
 
 part 'content_model.freezed.dart';
 part 'content_model.g.dart';
@@ -16,6 +17,7 @@ class SecretContent with _$SecretContent {
     required String creatorId,
     required ContentType type,
     required Map<SubscriptionTier, bool> tierAccess,
+    String? textContent,
     String? encryptedBody,
     String? storagePath,
     String? thumbnailPath,
@@ -68,6 +70,17 @@ class SecretContent with _$SecretContent {
       return null;
     }
   }
+
+  // Added getter to return the minimum required subscription tier for access.
+  SubscriptionTier get minRequiredTier {
+    final accessibleTiers =
+        tierAccess.keys.where((tier) => tierAccess[tier] == true);
+    if (accessibleTiers.isEmpty) {
+      // Fallback to a default tier, adjust as needed.
+      return SubscriptionTier.generalAdmission;
+    }
+    return accessibleTiers.reduce((a, b) => a.index < b.index ? a : b);
+  }
 }
 
 enum ContentType {
@@ -77,12 +90,6 @@ enum ContentType {
   audio,
   pdf,
   ar,
-}
-
-enum SubscriptionTier {
-  generalAdmission,
-  backstagePass,
-  innerCircle,
 }
 
 @immutable
