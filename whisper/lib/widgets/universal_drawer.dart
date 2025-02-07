@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:whisper/features/profile/screens/profile_screen.dart';
 import 'package:provider/provider.dart'; // <-- Added import
 import 'package:whisper/theme/theme_service.dart'; // <-- Added import for ThemeService
+import 'package:whisper/features/messages/screens/messages_list_screen.dart';
 
 class UniversalDrawer extends StatelessWidget {
   const UniversalDrawer({super.key});
@@ -84,6 +85,19 @@ class UniversalDrawer extends StatelessWidget {
                 },
               ),
               const Divider(),
+              ListTile(
+                leading: const Icon(Icons.message),
+                title: const Text('Messaging'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const MessagesListScreen(),
+                    ),
+                  );
+                },
+              ),
               ListTile(
                 leading: const Icon(Icons.logout),
                 title: const Text('Logout'),

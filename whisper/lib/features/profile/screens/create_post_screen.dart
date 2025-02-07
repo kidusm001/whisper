@@ -25,7 +25,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   bool _isPublished = true;
   String? _selectedTier;
   final List<String> _availableTiers = ['Free', 'Premium'];
-  final bool _isLoading = false;
   late BuildContext _stateContext;
 
   @override
