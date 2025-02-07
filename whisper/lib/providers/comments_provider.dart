@@ -41,14 +41,14 @@ class CommentsNotifier extends StateNotifier<Map<String, List<CommentModel>>> {
     try {
       final batch = _firestore.batch();
 
-      // Add reply as a regular comment
+      // Add reply as a regular comment with proper parent reference
       final replyRef = _firestore.collection('comments').doc(reply.id);
-      final replyData = {
+      batch.set(replyRef, {
         ...reply.toJson(),
         'parentId': parentComment.id,
-        'replyTo': parentComment.authorId,
-      };
-      batch.set(replyRef, replyData);
+        'replyToId': parentComment.authorId,
+        'replyToName': parentComment.authorName,
+      });
 
       // Update parent comment's reply count
       final parentRef = _firestore.collection('comments').doc(parentComment.id);
@@ -63,6 +63,7 @@ class CommentsNotifier extends StateNotifier<Map<String, List<CommentModel>>> {
         reply.postId: [reply, ...currentComments],
       };
     } catch (e) {
+      debugPrint('Error adding reply: $e');
       rethrow;
     }
   }
