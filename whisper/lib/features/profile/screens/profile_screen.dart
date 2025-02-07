@@ -115,12 +115,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                     child: ElevatedButton(
                                       onPressed: _updateCoverImage,
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.black
-                                            .withValues(
-                                                red: 0,
-                                                green: 0,
-                                                blue: 0,
-                                                alpha: 179),
+                                        backgroundColor: Colors.black.withOpacity(0.7),
                                       ),
                                       child: const Text('Change Cover'),
                                     ),
@@ -219,13 +214,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
+                                  boxShadow:const [
                                     BoxShadow(
-                                      color: Colors.grey.withValues(
-                                          red: 128,
-                                          green: 128,
-                                          blue: 128,
-                                          alpha: 153),
+                                      color: Color.fromARGB(
+                                          153,
+                                          128,
+                                          128,
+                                          128),
                                       spreadRadius: 1,
                                       blurRadius: 5,
                                     ),
@@ -253,11 +248,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                             color: Colors.white,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.grey.withValues(
-                                    red: 128,
-                                    green: 128,
-                                    blue: 128,
-                                    alpha: 153),
+                                color: Color.fromARGB(
+                                    153,
+                                    128,
+                                    128,
+                                    128),
                                 spreadRadius: 1,
                                 blurRadius: 5,
                               ),
@@ -319,8 +314,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         child: _isEditing
                             ? ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.black.withValues(
-                                      red: 0, green: 0, blue: 0, alpha: 179),
+                                  backgroundColor: Colors.black.withOpacity(0.7),
                                 ),
                                 onPressed: () => _saveProfile(user),
                                 child: const Text('Save',
