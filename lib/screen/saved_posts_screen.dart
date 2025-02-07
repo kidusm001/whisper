@@ -102,6 +102,19 @@ class SavedPostsScreen extends ConsumerWidget {
                                 );
                               },
                             ),
+                            const Spacer(),
+                            IconButton(
+                              icon: Icon(
+                                Icons.bookmark,
+                                color: Theme.of(context).colorScheme.primary,
+                                size: 28,
+                              ),
+                              onPressed: () {
+                                ref
+                                    .read(savedPostsProvider.notifier)
+                                    .togglePost(post);
+                              },
+                            ),
                           ],
                         ),
                       ],

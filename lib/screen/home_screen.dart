@@ -5,6 +5,7 @@ import '../features/models/post_model.dart';
 import '../providers/saved_posts_provider.dart'; // Import the provider
 import '../features/screens/comment_screen.dart';
 import '../providers/likes_provider.dart';
+import '../providers/follows_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   final VoidCallback toggleTheme;
@@ -123,6 +124,26 @@ class PostCard extends ConsumerStatefulWidget {
 }
 
 class _PostCardState extends ConsumerState<PostCard> {
+  bool _showCheckmark = false;
+
+  void _handleFollow(String creatorId) async {
+    final result = await Navigator.pushNamed(context, '/subscription-tiers');
+    if (result != null && result is String) {
+      ref.read(followsProvider.notifier).followCreator(creatorId, result);
+      setState(() {
+        _showCheckmark = true;
+      });
+      // Show checkmark briefly before hiding the button
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          setState(() {
+            _showCheckmark = false;
+          });
+        }
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isSaved =
@@ -131,6 +152,8 @@ class _PostCardState extends ConsumerState<PostCard> {
         ref.watch(likesProvider).likedPosts[widget.post.id] ?? false;
     final likeCount = ref.watch(likesProvider).likeCounts[widget.post.id] ??
         widget.post.likesCount;
+    final isFollowing =
+        ref.watch(followsProvider).following[widget.post.authorId] ?? false;
     final theme = Theme.of(context);
 
     return Card(
@@ -156,10 +179,17 @@ class _PostCardState extends ConsumerState<PostCard> {
                   color: theme.hintColor,
                 ),
               ),
-              trailing: IconButton(
-                icon: Icon(Icons.person_add, color: theme.iconTheme.color),
-                onPressed: () => widget.followUser('userId'),
-              ),
+              trailing: !isFollowing
+                  ? IconButton(
+                      icon: Icon(
+                        _showCheckmark ? Icons.check_circle : Icons.person_add,
+                        color: _showCheckmark
+                            ? Colors.green
+                            : theme.iconTheme.color,
+                      ),
+                      onPressed: () => _handleFollow(widget.post.authorId),
+                    )
+                  : null,
             ),
             Padding(
               padding: const EdgeInsets.all(16),

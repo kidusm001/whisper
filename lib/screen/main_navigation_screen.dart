@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../screen/home_screen.dart';
 import 'messages_screen.dart';
-import 'memberships_screen.dart';
+import 'membership_screen.dart';
 import 'saved_posts_screen.dart';
 import 'explore_creators_screen.dart';
 
@@ -27,10 +27,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     super.initState();
     _screens = [
       HomeScreen(toggleTheme: widget.toggleTheme),
-      const MessagesScreen(),
-      const MembershipsScreen(),
-      const SavedPostsScreen(),
       const ExploreCreatorsScreen(),
+      const MessagesScreen(),
+      const MembershipScreen(),
+      const SavedPostsScreen(),
     ];
   }
 
@@ -140,19 +140,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 children: [
                   _buildDrawerItem(icon: Icons.home, title: 'Home', index: 0),
                   _buildDrawerItem(
-                      icon: Icons.message, title: 'Messages', index: 1),
-                  ListTile(
-                    leading: const Icon(Icons.group),
-                    title: const Text('Memberships'),
-                    onTap: () {
-                      Navigator.pop(context); // Close drawer
-                      Navigator.pushNamed(context, '/subscription-tiers');
-                    },
-                  ),
+                      icon: Icons.explore, title: 'Explore', index: 1),
                   _buildDrawerItem(
-                      icon: Icons.bookmark, title: 'Saved', index: 3),
+                      icon: Icons.message, title: 'Messages', index: 2),
                   _buildDrawerItem(
-                      icon: Icons.explore, title: 'Explore', index: 4),
+                      icon: Icons.group, title: 'Memberships', index: 3),
+                  _buildDrawerItem(
+                      icon: Icons.bookmark, title: 'Saved', index: 4),
                   const Divider(),
                   ListTile(
                     leading:
@@ -239,13 +233,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       case 0:
         return 'Home';
       case 1:
-        return 'Messages';
-      case 2:
-        return 'My Memberships';
-      case 3:
-        return 'Saved Posts';
-      case 4:
         return 'Explore Creators';
+      case 2:
+        return 'Messages';
+      case 3:
+        return 'Memberships';
+      case 4:
+        return 'Saved Posts';
       default:
         return '';
     }
