@@ -39,7 +39,7 @@ class SavedPostsScreen extends ConsumerWidget {
                           contentPadding: EdgeInsets.zero,
                           leading: const CircleAvatar(
                             backgroundImage:
-                                NetworkImage('https://placeholder.com/50x50'),
+                                NetworkImage('https://via.placeholder.com/50'),
                           ),
                           title: Text(
                             post.authorName ?? 'Creator',
