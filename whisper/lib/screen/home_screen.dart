@@ -3,15 +3,19 @@ import 'package:whisper/widgets/universal_app_bar.dart';
 import 'package:whisper/widgets/universal_drawer.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  HomeScreen({super.key});
+
+  final GlobalKey<ScaffoldState> _scaffoldKey =
+      GlobalKey<ScaffoldState>(); // <-- New GlobalKey
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey, // <-- Assign key to Scaffold
       appBar: UniversalAppBar(
         title: 'Whisper',
         onMenuPressed: () {
-          Scaffold.of(context).openDrawer();
+          _scaffoldKey.currentState?.openDrawer(); // <-- Use key to open drawer
         },
       ),
       drawer: const UniversalDrawer(),

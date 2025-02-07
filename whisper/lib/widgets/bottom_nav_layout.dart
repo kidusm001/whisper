@@ -14,9 +14,9 @@ class _BottomNavLayoutState extends State<BottomNavLayout> {
   int _selectedIndex = 0;
 
   final List<Widget> _screens = [
-    const HomeScreen(),
-    const HomeScreen(), // Dummy for center button
-    const ExploreScreen(),
+    HomeScreen(), // Removed 'const'
+    HomeScreen(), // Dummy for center button, removed 'const'
+    const ExploreScreen(), // Removed 'const'
   ];
 
   @override
