@@ -14,7 +14,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:whisper/features/profile/screens/create_post_screen.dart';
 import 'package:whisper/features/widgets/post_card.dart';
-import '../../../utils/fix_post_counts.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
