@@ -10,20 +10,32 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Add follows collection rules
+    match /follows/{followId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow delete: if isAuthenticated() && (
+        request.auth.uid == resource.data.followerId
+      );
+    }
+
     // User collection rules
     match /users/{userId} {
       allow read: if true;
-      allow write: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        request.auth.uid == userId || 
+        (request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['followerCount', 'followingCount']))
+      );
+      allow create: if isAuthenticated();
     }
 
     // Post rules - updated to handle null isDeleted field
     match /posts/{postId} {
-      allow read: if true;
-      allow create, update, delete: if isAuthenticated();
+      allow read, list: if true;
+      allow create, update: if isAuthenticated();
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.authorId;
 
-      // For posts queries
-      allow list: if true;  // Allow listing posts
-      
       // Comments subcollection
       match /comments/{commentId} {
         allow read: if true;
