@@ -11,8 +11,6 @@ Future<void> fixAllUsersPostCounts() async {
         .count()
         .get();
 
-    await userDoc.reference.update({
-      'postsCount': postsCount.count
-    });
+    await userDoc.reference.update({'postsCount': postsCount.count});
   }
 }
