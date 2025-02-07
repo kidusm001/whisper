@@ -26,16 +26,29 @@ class ExploreScreen extends StatelessWidget {
       ),
       drawer: const UniversalDrawer(),
       body: StreamBuilder<QuerySnapshot>(
-        // Removed orderBy to avoid composite index error; dropping automatic ordering
-        stream: FirebaseFirestore.instance
-            .collection('posts')
-            .where('isDeleted', isEqualTo: false)
-            .snapshots(),
+        stream: FirebaseAuth.instance.currentUser != null
+            ? FirebaseFirestore.instance
+                .collection('posts')
+                .where('isDeleted', isEqualTo: false)
+                .snapshots()
+            : const Stream.empty(), // Return empty stream if not authenticated
         builder: (context, snapshot) {
           debugPrint('StreamBuilder state: ${snapshot.connectionState}');
           if (snapshot.hasError) {
-            debugPrint('ERROR in ExploreScreen: ${snapshot.error}');
-            return Center(child: Text('Error: ${snapshot.error}'));
+            debugPrint('Error in ExploreScreen: ${snapshot.error}');
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Something went wrong\n${snapshot.error}',
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            );
           }
           if (snapshot.connectionState == ConnectionState.waiting) {
             debugPrint('Loading posts...');
