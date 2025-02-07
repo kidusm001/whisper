@@ -63,8 +63,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         'Password',
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                            color: Colors.white.withOpacity(0.7),
+                            _obscurePassword
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                            color: Colors.white.withValues(
+                                red: 255,
+                                green: 255,
+                                blue: 255,
+                                alpha: 179), // 0.7 opacity = 179 alpha
                           ),
                           onPressed: () {
                             setState(() {
@@ -84,7 +90,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 32),
                     if (_isLoading)
                       const CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF320064)),
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Color(0xFF320064)),
                       )
                     else
                       SizedBox(
@@ -109,7 +116,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Text(
                         "Don't have an account? Sign up",
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.7),
+                          color: Colors.white.withValues(
+                              red: 255, green: 255, blue: 255, alpha: 179),
                         ),
                       ),
                     ),
@@ -126,7 +134,10 @@ class _LoginScreenState extends State<LoginScreen> {
   InputDecoration _buildInputDecoration(String label, {Widget? suffixIcon}) {
     return InputDecoration(
       labelText: label,
-      labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+      labelStyle: TextStyle(
+        color: Colors.white
+            .withValues(red: 255, green: 255, blue: 255, alpha: 179),
+      ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: BorderSide.none,
@@ -186,4 +197,4 @@ class _LoginScreenState extends State<LoginScreen> {
     _passwordController.dispose();
     super.dispose();
   }
-} 
+}
