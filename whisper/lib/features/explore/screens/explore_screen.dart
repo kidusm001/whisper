@@ -10,15 +10,18 @@ class ExploreScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final GlobalKey<ScaffoldState> scaffoldKey =
+        GlobalKey<ScaffoldState>(); // <-- New key
     debugPrint('Building ExploreScreen');
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     debugPrint('Current User ID: $currentUserId');
 
     return Scaffold(
+      key: scaffoldKey, // <-- Assign key
       appBar: UniversalAppBar(
         title: 'Explore Posts',
         onMenuPressed: () {
-          Scaffold.of(context).openDrawer();
+          scaffoldKey.currentState?.openDrawer(); // <-- Use key to open drawer
         },
       ),
       drawer: const UniversalDrawer(),

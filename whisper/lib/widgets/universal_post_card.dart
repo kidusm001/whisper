@@ -346,17 +346,19 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Use theme's icon color by default
+    final defaultColor = Theme.of(context).iconTheme.color;
     return GestureDetector(
       onTap: onTap,
       child: Row(
         children: [
-          Icon(icon, size: 24, color: color ?? Colors.black87),
+          Icon(icon, size: 24, color: color ?? defaultColor),
           if (count != null) ...[
             const SizedBox(width: 4),
             Text(
               count.toString(),
               style: TextStyle(
-                color: color ?? Colors.black87,
+                color: color ?? defaultColor,
                 fontWeight: FontWeight.w500,
               ),
             ),

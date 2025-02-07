@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:whisper/features/profile/screens/profile_screen.dart';
+import 'package:provider/provider.dart'; // <-- Added import
+import 'package:whisper/theme/theme_service.dart'; // <-- Added import for ThemeService
 
 class UniversalDrawer extends StatelessWidget {
   const UniversalDrawer({super.key});
@@ -67,6 +69,20 @@ class UniversalDrawer extends StatelessWidget {
                   Navigator.pop(context);
                 },
               ),
+              // Add theme toggle switch
+              Consumer<ThemeService>(
+                builder: (context, themeService, _) {
+                  return SwitchListTile(
+                    secondary: const Icon(Icons.brightness_6),
+                    title: const Text('Dark Mode'),
+                    value: themeService.isDarkMode,
+                    onChanged: (value) {
+                      themeService.setThemeMode(
+                          value ? ThemeMode.dark : ThemeMode.light);
+                    },
+                  );
+                },
+              ),
               const Divider(),
               ListTile(
                 leading: const Icon(Icons.logout),
@@ -74,7 +90,12 @@ class UniversalDrawer extends StatelessWidget {
                 onTap: () async {
                   await FirebaseAuth.instance.signOut();
                   if (context.mounted) {
-                    Navigator.pop(context);
+                    Navigator.pop(context); // Close the drawer
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      '/login',
+                      (route) => false,
+                    );
                   }
                 },
               ),

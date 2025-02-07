@@ -8,6 +8,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screen/profile_setup_screen.dart';
 import 'utils/migrate_posts.dart';
 import 'widgets/bottom_nav_layout.dart';
+import 'package:provider/provider.dart';
+import 'package:whisper/theme/app_theme.dart';
+import 'package:whisper/theme/theme_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +28,13 @@ Future<void> main() async {
   // Run migration for existing posts
   await migrateExistingPosts();
 
-  runApp(const MyApp());
+  final prefs = await SharedPreferences.getInstance();
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => ThemeService(prefs),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -32,19 +42,23 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Whisper',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      initialRoute: '/login',
-      routes: {
-        '/login': (context) => const LoginScreen(),
-        '/signup': (context) => const SignupScreen(),
-        '/home': (context) => const BottomNavLayout(), // Updated this line
-        '/profile-setup': (context) => const ProfileSetupScreen(),
-        '/profile': (context) => const ProfileScreen(),
+    return Consumer<ThemeService>(
+      builder: (context, themeService, _) {
+        return MaterialApp(
+          title: 'Whisper',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: themeService.themeMode,
+          initialRoute: '/login',
+          routes: {
+            '/login': (context) => const LoginScreen(),
+            '/signup': (context) => const SignupScreen(),
+            '/home': (context) => const BottomNavLayout(), // Updated this line
+            '/profile-setup': (context) => const ProfileSetupScreen(),
+            '/profile': (context) => const ProfileScreen(),
+          },
+        );
       },
     );
   }
