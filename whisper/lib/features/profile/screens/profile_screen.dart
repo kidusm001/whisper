@@ -244,7 +244,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         const SizedBox(height: 16),
                         // Tabs
                         Container(
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             color: Colors.white,
                             boxShadow: [
                               BoxShadow(
