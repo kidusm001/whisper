@@ -52,6 +52,7 @@ dependencies:
   uuid: ^4.5.1
   provider: ^6.1.1
   flutter_riverpod: ^2.0.0  # Add the riverpod dependency (use the latest compatible version)
+  timeago: ^3.6.0  # Add this line
 
 dev_dependencies:
   flutter_test:

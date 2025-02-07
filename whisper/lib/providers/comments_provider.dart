@@ -37,6 +37,36 @@ class CommentsNotifier extends StateNotifier<Map<String, List<CommentModel>>> {
     }
   }
 
+  Future<void> addReply(CommentModel parentComment, CommentModel reply) async {
+    try {
+      final batch = _firestore.batch();
+
+      // Add reply as a regular comment
+      final replyRef = _firestore.collection('comments').doc(reply.id);
+      final replyData = {
+        ...reply.toJson(),
+        'parentId': parentComment.id,
+        'replyTo': parentComment.authorId,
+      };
+      batch.set(replyRef, replyData);
+
+      // Update parent comment's reply count
+      final parentRef = _firestore.collection('comments').doc(parentComment.id);
+      batch.update(parentRef, {'replyCount': FieldValue.increment(1)});
+
+      await batch.commit();
+
+      // Update local state
+      final currentComments = state[reply.postId] ?? [];
+      state = {
+        ...state,
+        reply.postId: [reply, ...currentComments],
+      };
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<void> toggleLike(String commentId) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
@@ -113,6 +143,24 @@ class CommentsNotifier extends StateNotifier<Map<String, List<CommentModel>>> {
       return Stream.value([]);
     }
   }
+
+  Stream<List<CommentModel>> streamRepliesForComment(String commentId) {
+    try {
+      return _firestore
+          .collection('comments')
+          .where('parentId', isEqualTo: commentId)
+          .snapshots()
+          .map((snapshot) {
+        return snapshot.docs
+            .map((doc) => CommentModel.fromJson(doc.data()))
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      });
+    } catch (e) {
+      debugPrint('Error loading replies: $e');
+      return Stream.value([]);
+    }
+  }
 }
 
 final commentsProvider =
@@ -123,4 +171,9 @@ final commentsProvider =
 final commentsStreamProvider =
     StreamProvider.family<List<CommentModel>, String>((ref, postId) {
   return ref.read(commentsProvider.notifier).streamCommentsForPost(postId);
+});
+
+final commentRepliesProvider =
+    StreamProvider.family<List<CommentModel>, String>((ref, commentId) {
+  return ref.read(commentsProvider.notifier).streamRepliesForComment(commentId);
 });

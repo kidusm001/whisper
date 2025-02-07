@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../features/models/comment_model.dart';
 import '../providers/comments_provider.dart';
+import '../providers/comment_likes_provider.dart';
+import 'comment_tile.dart';
 
 class CommentsSheet extends ConsumerStatefulWidget {
   final String postId;
@@ -17,6 +19,7 @@ class CommentsSheet extends ConsumerStatefulWidget {
 class _CommentsSheetState extends ConsumerState<CommentsSheet> {
   final _controller = TextEditingController();
   final _auth = FirebaseAuth.instance;
+  CommentModel? _replyingTo;
 
   @override
   void initState() {
@@ -33,7 +36,24 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
     super.dispose();
   }
 
-  Future<void> _handleAddComment(BuildContext context) async {
+  void _startReply(CommentModel comment) {
+    setState(() {
+      _replyingTo = comment;
+      _controller.text = '@${comment.authorName} ';
+    });
+    _controller.selection = TextSelection.fromPosition(
+      TextPosition(offset: _controller.text.length),
+    );
+  }
+
+  void _cancelReply() {
+    setState(() {
+      _replyingTo = null;
+      _controller.clear();
+    });
+  }
+
+  Future<void> _handleAddComment() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
 
@@ -50,28 +70,61 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
 
       final userData = userDoc.data() ?? {};
 
+      // Match UniversalPostCard fallback:
+      final displayName = [
+        userData['displayName']?.toString().trim(),
+        userData['username']?.toString().trim(),
+        currentUser.displayName?.trim(),
+      ].whereType<String>().firstWhere(
+            (name) => name.isNotEmpty,
+            orElse: () => 'Anonymous',
+          );
+
+      final profileImage = [
+        userData['photoUrl']?.toString(),
+        userData['photoURL']?.toString(),
+        userData['profileImage']?.toString(),
+        userData['avatar']?.toString(),
+        userData['coverImage']?.toString(),
+        currentUser.photoURL,
+      ].whereType<String>().firstWhere(
+            (url) => url.trim().isNotEmpty,
+            orElse: () =>
+                'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y',
+          );
+
       final comment = CommentModel(
         id: FirebaseFirestore.instance.collection('comments').doc().id,
         postId: widget.postId,
         authorId: currentUser.uid,
-        authorName: userData['displayName'] ?? userData['username'],
-        authorImage: userData['photoUrl'] ?? userData['profileImage'],
+        authorName: displayName,
+        authorImage: profileImage,
         content: text,
         createdAt: DateTime.now(),
         likesCount: 0,
         likedBy: [],
+        authorRole: userData['role'] ?? 'Member',
+        parentId: _replyingTo?.id,
+        replyToId: _replyingTo?.authorId,
+        replyToName: _replyingTo?.authorName,
       );
 
-      await ref.read(commentsProvider.notifier).addComment(comment);
-      if (!mounted) return;
+      if (_replyingTo != null) {
+        await ref
+            .read(commentsProvider.notifier)
+            .addReply(_replyingTo!, comment);
+      } else {
+        await ref.read(commentsProvider.notifier).addComment(comment);
+      }
 
+      if (!mounted) return;
       _controller.clear();
-      // Force refresh comments
-      ref.refresh(commentsStreamProvider(widget.postId));
+      _cancelReply(); // Clear reply state
+      ref.invalidate(commentsStreamProvider(widget.postId));
     } catch (e) {
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.showSnackBar(
         SnackBar(
           content: Text('Failed to add comment: ${e.toString()}'),
           behavior: SnackBarBehavior.floating,
@@ -83,12 +136,13 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
   @override
   Widget build(BuildContext context) {
     final commentsAsyncValue = ref.watch(commentsStreamProvider(widget.postId));
+    final theme = Theme.of(context);
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.8,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.background,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         children: [
@@ -101,29 +155,26 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.chat_bubble_outline,
                           size: 64,
-                          color: Colors.grey,
+                          color:
+                              theme.colorScheme.onBackground.withOpacity(0.4),
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'No comments yet\nBe the first to comment!',
+                          'Start the conversation\nBe the first to comment!',
                           textAlign: TextAlign.center,
-                          style:
-                              Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                    color: Colors.grey[600],
-                                  ),
-                        ),
-                        const SizedBox(height: 8),
-                        Icon(
-                          Icons.arrow_downward,
-                          color: Theme.of(context).primaryColor,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color:
+                                theme.colorScheme.onBackground.withOpacity(0.6),
+                          ),
                         ),
                       ],
                     ),
                   );
                 }
+
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: comments.length,
@@ -135,15 +186,20 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 16),
-                      child: _CommentTile(
+                      child: CommentTile(
                         comment: comment,
                         isLiked: isLiked,
-                        likeCount: comment.likesCount,
                         onLikePressed: () {
                           ref
                               .read(commentsProvider.notifier)
                               .toggleLike(comment.id);
                         },
+                        onReplyPressed: () => _startReply(comment),
+                        showReplies: true,
+                        replies: ref
+                                .watch(commentRepliesProvider(comment.id))
+                                .value ??
+                            [],
                       ),
                     );
                   },
@@ -185,6 +241,29 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
               },
             ),
           ),
+          if (_replyingTo != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: Theme.of(context).colorScheme.surfaceVariant,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Replying to ${_replyingTo!.authorName}',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: _cancelReply,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
+            ),
           Container(
             padding: EdgeInsets.only(
               left: 16,
@@ -220,11 +299,12 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
                         vertical: 8,
                       ),
                     ),
+                    onSubmitted: (_) => _handleAddComment(),
                   ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.send),
-                  onPressed: () => _handleAddComment(context),
+                  onPressed: _handleAddComment,
                 ),
               ],
             ),
@@ -265,184 +345,6 @@ class _CommentsHeader extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.close),
             onPressed: () => Navigator.pop(context),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CommentTile extends StatelessWidget {
-  final CommentModel comment;
-  final bool isLiked;
-  final int likeCount;
-  final VoidCallback onLikePressed;
-
-  const _CommentTile({
-    required this.comment,
-    required this.isLiked,
-    required this.likeCount,
-    required this.onLikePressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<DocumentSnapshot>(
-      future: FirebaseFirestore.instance
-          .collection('users')
-          .doc(comment.authorId)
-          .get(),
-      builder: (context, userSnapshot) {
-        if (userSnapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        final userData =
-            userSnapshot.data?.data() as Map<String, dynamic>? ?? {};
-
-        // Combine comment data with user data for display
-        final String displayName = comment.authorName?.toString().trim() ??
-            userData['displayName']?.toString().trim() ??
-            userData['username']?.toString().trim() ??
-            'Anonymous';
-
-        // Use the same profile image logic as UniversalPostCard
-        final String profileImage = [
-          if (comment.authorImage != null) comment.authorImage!,
-          if (userData['photoUrl'] != null) userData['photoUrl'] as String,
-          if (userData['photoURL'] != null) userData['photoURL'] as String,
-          if (userData['profileImage'] != null)
-            userData['profileImage'] as String,
-          if (userData['avatar'] != null) userData['avatar'] as String,
-          if (userData['coverImage'] != null) userData['coverImage'] as String,
-        ].firstWhere((image) => image.trim().isNotEmpty,
-            orElse: () =>
-                'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y');
-
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundImage: NetworkImage(profileImage),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      displayName,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(comment.content),
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            isLiked ? Icons.favorite : Icons.favorite_border,
-                            color: isLiked ? Colors.red : Colors.grey,
-                          ),
-                          onPressed: onLikePressed,
-                        ),
-                        Text('$likeCount'),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _CommentInput extends StatefulWidget {
-  final String postId;
-  final void Function(CommentModel) onSubmit;
-
-  const _CommentInput({
-    required this.postId,
-    required this.onSubmit,
-  });
-
-  @override
-  State<_CommentInput> createState() => _CommentInputState();
-}
-
-class _CommentInputState extends State<_CommentInput> {
-  final _controller = TextEditingController();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            offset: const Offset(0, -1),
-            blurRadius: 4,
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _controller,
-              decoration: InputDecoration(
-                hintText: 'Add a comment...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: Colors.grey.shade100,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.send),
-            color: Theme.of(context).colorScheme.primary,
-            onPressed: () {
-              final currentUser = FirebaseAuth.instance.currentUser;
-              if (currentUser == null || _controller.text.trim().isEmpty) {
-                return;
-              }
-
-              final comment = CommentModel(
-                id: FirebaseFirestore.instance.collection('comments').doc().id,
-                postId: widget.postId,
-                authorId: currentUser.uid,
-                authorName: currentUser.displayName ?? 'Anonymous',
-                authorImage: currentUser.photoURL,
-                content: _controller.text.trim(),
-                createdAt: DateTime.now(),
-              );
-
-              widget.onSubmit(comment);
-              _controller.clear();
-            },
           ),
         ],
       ),
