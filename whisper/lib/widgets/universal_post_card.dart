@@ -30,7 +30,7 @@ class _UniversalPostCardState extends State<UniversalPostCard> {
         .collection('follows')
         .doc('${currentUser.uid}_${widget.postData['authorId']}')
         .get();
-    if (doc.exists) {
+    if (doc.exists && mounted) {
       setState(() {
         _isFollowing = true;
       });
@@ -79,15 +79,25 @@ class _UniversalPostCardState extends State<UniversalPostCard> {
 
   @override
   Widget build(BuildContext context) {
-    final mediaUrls = (widget.postData['mediaUrls'] as List<dynamic>?) ?? [];
     final currentUser = FirebaseAuth.instance.currentUser;
+    // Move mediaUrls declaration out of the children list
+    final mediaUrls = (widget.postData['mediaUrls'] as List<dynamic>?) ?? [];
     final bool showFollow =
         currentUser != null && currentUser.uid != widget.postData['authorId'];
 
-    // Fix String? type issue with proper null check and default value
-    final String authorName =
-        ((widget.postData['authorName'] as String?) ?? '').trim();
-    final displayName = authorName.isNotEmpty ? authorName : "Anonymous";
+    // Compute displayName fallback from postData
+    final String postDisplayName =
+        (((widget.postData['authorName'] as String?) ?? '').trim().isNotEmpty
+                    ? (widget.postData['authorName'] as String).trim()
+                    : (((widget.postData['displayName'] as String?) ?? '')
+                        .trim()))
+                .isNotEmpty
+            ? (((widget.postData['authorName'] as String?) ?? '')
+                    .trim()
+                    .isNotEmpty
+                ? (widget.postData['authorName'] as String).trim()
+                : (widget.postData['displayName'] as String).trim())
+            : "Anonymous";
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -95,16 +105,33 @@ class _UniversalPostCardState extends State<UniversalPostCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with author info
+          // Header with author info using FutureBuilder to fetch user details if missing
           ListTile(
             leading: CircleAvatar(
               backgroundImage: NetworkImage(widget.postData['authorImage'] ??
                   'https://placeholder.com/50x50'),
             ),
-            title: Text(
-              displayName, // Updated display name
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold, color: Colors.black),
+            title: FutureBuilder<DocumentSnapshot>(
+              future: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(widget.postData['authorId'])
+                  .get(),
+              builder: (context, snapshot) {
+                if (snapshot.hasData && snapshot.data!.exists) {
+                  final data = snapshot.data!.data() as Map<String, dynamic>;
+                  final name = ((data['displayName'] as String?) ?? '').trim();
+                  return Text(
+                    name.isNotEmpty ? name : postDisplayName,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, color: Colors.black),
+                  );
+                }
+                return Text(
+                  postDisplayName,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.black),
+                );
+              },
             ),
             subtitle: Text(
               widget.postData['role'] ?? 'Member',
@@ -145,7 +172,7 @@ class _UniversalPostCardState extends State<UniversalPostCard> {
               ],
             ),
           ),
-          // Media content if exists
+          // Media content if exists (mediaUrls declared above)
           if (mediaUrls.isNotEmpty)
             Container(
               height: 200,
