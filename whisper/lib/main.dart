@@ -8,7 +8,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screen/profile_setup_screen.dart';
 import 'utils/migrate_posts.dart';
 import 'widgets/bottom_nav_layout.dart';
-import 'package:provider/provider.dart';
+import 'package:provider/provider.dart' as provider;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:whisper/theme/app_theme.dart';
 import 'package:whisper/theme/theme_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -30,9 +31,11 @@ Future<void> main() async {
 
   final prefs = await SharedPreferences.getInstance();
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeService(prefs),
-      child: const MyApp(),
+    ProviderScope(
+      child: provider.ChangeNotifierProvider<ThemeService>(
+        create: (_) => ThemeService(prefs),
+        child: const MyApp(),
+      ),
     ),
   );
 }
@@ -42,7 +45,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ThemeService>(
+    return provider.Consumer<ThemeService>(
       builder: (context, themeService, _) {
         return MaterialApp(
           title: 'Whisper',
@@ -54,7 +57,7 @@ class MyApp extends StatelessWidget {
           routes: {
             '/login': (context) => const LoginScreen(),
             '/signup': (context) => const SignupScreen(),
-            '/home': (context) => const BottomNavLayout(), // Updated this line
+            '/home': (context) => const BottomNavLayout(),
             '/profile-setup': (context) => const ProfileSetupScreen(),
             '/profile': (context) => const ProfileScreen(),
           },

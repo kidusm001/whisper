@@ -3,16 +3,17 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:whisper/widgets/comments_sheet.dart'; // NEW IMPORT
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // Add this import
 
-class UniversalPostCard extends StatefulWidget {
+class UniversalPostCard extends ConsumerStatefulWidget {
   final Map<String, dynamic> postData;
   const UniversalPostCard({super.key, required this.postData});
 
   @override
-  State<UniversalPostCard> createState() => _UniversalPostCardState();
+  ConsumerState<UniversalPostCard> createState() => _UniversalPostCardState();
 }
 
-class _UniversalPostCardState extends State<UniversalPostCard>
+class _UniversalPostCardState extends ConsumerState<UniversalPostCard>
     with SingleTickerProviderStateMixin {
   bool _isFollowing = false;
   final _auth = FirebaseAuth.instance;
@@ -27,18 +28,24 @@ class _UniversalPostCardState extends State<UniversalPostCard>
   }
 
   Future<void> _checkIfFollowing() async {
-    final currentUser = _auth.currentUser;
-    if (currentUser == null || currentUser.uid == widget.postData['authorId']) {
-      return;
-    }
-    final doc = await _firestore
-        .collection('follows')
-        .doc('${currentUser.uid}_${widget.postData['authorId']}')
-        .get();
-    if (doc.exists && mounted) {
-      setState(() {
-        _isFollowing = true;
-      });
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null ||
+          currentUser.uid == widget.postData['authorId']) {
+        return;
+      }
+      final doc = await _firestore
+          .collection('follows')
+          .doc('${currentUser.uid}_${widget.postData['authorId']}')
+          .get();
+      if (doc.exists && mounted) {
+        setState(() {
+          _isFollowing = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking follow status: $e');
+      // Silently fail - don't show error to user
     }
   }
 
@@ -141,7 +148,10 @@ class _UniversalPostCardState extends State<UniversalPostCard>
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => CommentsSheet(postId: widget.postData['id']),
+      builder: (context) => ProviderScope(
+        // Add this wrapper
+        child: CommentsSheet(postId: widget.postData['id']),
+      ),
     );
   }
 

@@ -1,0 +1,113 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Comments collection - Updated rules
+    match /comments/{commentId} {
+      allow read: if true;  // Allow reading with indexes
+      allow create: if isAuthenticated() && 
+        request.resource.data.authorId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        // Allow original author to edit their comment
+        request.auth.uid == resource.data.authorId ||
+        // Allow likes updates by checking only likesCount and likedBy changes
+        (request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['likesCount', 'likedBy']))
+      );
+      allow delete: if isAuthenticated() && 
+        request.auth.uid == resource.data.authorId;
+    }
+
+    // Comment likes collection - New specific rules
+    match /comment_likes/{likeId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && 
+        likeId.matches(request.auth.uid + '_.*');
+    }
+
+    // Posts collection - Updated to handle comment counts
+    match /posts/{postId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        request.auth.uid == resource.data.authorId ||
+        // Allow comment count updates
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['commentCount'])
+      );
+      allow delete: if isAuthenticated() && 
+        request.auth.uid == resource.data.authorId;
+
+      // Comments subcollection
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuthenticated();
+        allow update, delete: if isAuthenticated() && resource.data.authorId == request.auth.uid;
+      }
+      
+      // Likes subcollection
+      match /likes/{likeId} {
+        allow read: if true;
+        allow create, delete: if isAuthenticated();
+      }
+    }
+
+    // Add follows collection rules
+    match /follows/{followId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow delete: if isAuthenticated() && (
+        request.auth.uid == resource.data.followerId
+      );
+    }
+
+    // User collection rules
+    match /users/{userId} {
+      allow read: if true;
+      allow update: if isAuthenticated() && (
+        request.auth.uid == userId || 
+        (request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['followerCount', 'followingCount']))
+      );
+      allow create: if isAuthenticated();
+    }
+
+    // Content access rules
+    match /content/{contentId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && request.auth.uid == resource.data.creatorId;
+    }
+
+    // Subscription rules
+    match /subscriptions/{subscriptionId} {
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+    
+    // Chating part
+    match /chatRooms/{roomId} {
+  	match /messages/{messageId} {
+    allow read: if request.auth != null && 
+      roomId.split('_').contains(request.auth.uid);
+    allow create: if request.auth != null && 
+      roomId.split('_').contains(request.auth.uid) &&
+      request.resource.data.senderId == request.auth.uid;
+  }
+}
+
+    // Tier access rules
+    match /tiers/{tier} {
+      allow read: if true;
+      allow write: if isAuthenticated() && request.auth.token.admin == true;
+    }
+  }
+}
