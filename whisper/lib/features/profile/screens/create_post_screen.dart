@@ -177,18 +177,34 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   Future<void> addPostToFirestore(PostModel post) async {
     final firestore = FirebaseFirestore.instance;
-    final batch = firestore.batch();
-
-    // Add the post document
-    final postRef = firestore.collection('posts').doc(post.id);
-    batch.set(postRef, post.toJson());
-
-    // Increment the user's post count
-    final userRef = firestore.collection('users').doc(post.authorId);
-    batch.update(userRef, {'postsCount': FieldValue.increment(1)});
 
     try {
+      // First, get the actual post count by querying posts collection
+      final postsCount = await firestore
+          .collection('posts')
+          .where('authorId', isEqualTo: post.authorId)
+          .count()
+          .get();
+      
+      final actualCount = postsCount.count;
+
+      // Use a batch write to ensure atomicity
+      final batch = firestore.batch();
+
+      // Add the post document
+      final postRef = firestore.collection('posts').doc(post.id);
+      batch.set(postRef, post.toJson());
+
+      // Update user document with accurate post count
+      final userRef = firestore.collection('users').doc(post.authorId);
+      batch.update(userRef, {
+        'postsCount': actualCount + 1
+      });
+
       await batch.commit();
+      
+      // Debug print to verify count
+      debugPrint('Updated post count to: ${actualCount + 1}');
     } catch (e) {
       debugPrint('Error creating post: $e');
       rethrow;

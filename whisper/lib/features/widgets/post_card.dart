@@ -14,13 +14,31 @@ class PostCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (post.mediaUrls.isNotEmpty)
-            Image.network(
-              post.mediaUrls[0],
-              width: double.infinity,
-              height: 200,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) =>
-                  const Center(child: Icon(Icons.error)),
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Image.network(
+                post.mediaUrls[0],
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  debugPrint('Error loading image: $error');
+                  return Container(
+                    color: Colors.grey[200],
+                    child: const Center(
+                      child: Icon(Icons.error_outline,
+                          size: 40, color: Colors.grey),
+                    ),
+                  );
+                },
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Container(
+                    color: Colors.grey[200],
+                    child: const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                },
+              ),
             ),
           Padding(
             padding: const EdgeInsets.all(12),
