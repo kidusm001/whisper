@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:whisper/widgets/comments_sheet.dart'; // NEW IMPORT
 import 'package:flutter_riverpod/flutter_riverpod.dart'; // Add this import
+import '../providers/likes_provider.dart'; // Add this import
 
 class UniversalPostCard extends ConsumerStatefulWidget {
   final Map<String, dynamic> postData;
@@ -18,7 +19,6 @@ class _UniversalPostCardState extends ConsumerState<UniversalPostCard>
   bool _isFollowing = false;
   final _auth = FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
-  bool _isLiked = false;
   bool _isSaved = false;
 
   @override
@@ -162,6 +162,11 @@ class _UniversalPostCardState extends ConsumerState<UniversalPostCard>
 
     final currentUser = FirebaseAuth.instance.currentUser;
     final mediaUrls = (widget.postData['mediaUrls'] as List<dynamic>?) ?? [];
+    final likes = ref.watch(likesProvider);
+    final isLiked = likes.likedPosts[widget.postData['id']] ?? false;
+    final likeCount = likes.likeCounts[widget.postData['id']] ??
+        widget.postData['likeCount'] ??
+        0;
 
     // Use FutureBuilder to get user data if not in post
     return FutureBuilder<DocumentSnapshot>(
@@ -299,12 +304,28 @@ class _UniversalPostCardState extends ConsumerState<UniversalPostCard>
                     Row(
                       children: [
                         _ActionButton(
-                          icon: _isLiked
+                          icon: isLiked
                               ? CupertinoIcons.heart_fill
                               : CupertinoIcons.heart,
-                          color: _isLiked ? Colors.red : Colors.black,
-                          onTap: () => setState(() => _isLiked = !_isLiked),
-                          count: widget.postData['likeCount'] ?? 0,
+                          color: isLiked ? Colors.red : Colors.black,
+                          onTap: () {
+                            ref.read(likesProvider.notifier).toggleLike(
+                                  widget.postData['id'],
+                                  widget.postData['likeCount'] ?? 0,
+                                );
+                            // Update Firestore
+                            _firestore
+                                .collection('posts')
+                                .doc(widget.postData['id'])
+                                .update({
+                              'likeCount':
+                                  FieldValue.increment(isLiked ? -1 : 1),
+                              'likedBy': isLiked
+                                  ? FieldValue.arrayRemove([currentUser?.uid])
+                                  : FieldValue.arrayUnion([currentUser?.uid]),
+                            });
+                          },
+                          count: likeCount,
                         ),
                         const SizedBox(width: 16),
                         _ActionButton(
