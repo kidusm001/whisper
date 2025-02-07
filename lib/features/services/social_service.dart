@@ -3,7 +3,6 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:supabase/supabase.dart' hide Storage;
-import 'package:supabase/supabase.dart' show PostgrestError;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/comment_model.dart';
 import '../models/follow_model.dart';

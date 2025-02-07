@@ -16,7 +16,8 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
-  List<Widget> _screens = [];
+  List<Widget> _screens = []; // Initialize once
+
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _isSearching = false;
   final _searchController = TextEditingController();
@@ -246,7 +247,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       case 4:
         return 'Explore Creators';
       default:
-        return 'Whisper';
+        return '';
     }
   }
 }

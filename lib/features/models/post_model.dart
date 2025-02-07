@@ -7,6 +7,7 @@ part 'post_model.g.dart';
 class PostModel {
   final String id;
   final String authorId;
+  final String? authorName;
   final String title;
   final String content;
   final List<String> mediaUrls;
@@ -15,13 +16,14 @@ class PostModel {
   final int commentsCount;
   final String? tier;
   final bool isPublished;
-  
+
   @JsonKey(fromJson: _timestampFromJson, toJson: _timestampToJson)
   final DateTime createdAt;
 
   PostModel({
     required this.id,
     required this.authorId,
+    this.authorName,
     required this.title,
     required this.content,
     required this.mediaUrls,
@@ -33,7 +35,7 @@ class PostModel {
     required this.createdAt,
   });
 
-  factory PostModel.fromJson(Map<String, dynamic> json) => 
+  factory PostModel.fromJson(Map<String, dynamic> json) =>
       _$PostModelFromJson(json);
 
   Map<String, dynamic> toJson() => _$PostModelToJson(this);
@@ -55,10 +57,12 @@ class PostModel {
     int? commentsCount,
     String? tier,
     bool? isPublished,
+    String? authorName,
   }) {
     return PostModel(
       id: id,
       authorId: authorId,
+      authorName: authorName ?? this.authorName,
       title: title ?? this.title,
       content: content ?? this.content,
       mediaUrls: mediaUrls ?? this.mediaUrls,
@@ -70,4 +74,4 @@ class PostModel {
       createdAt: createdAt,
     );
   }
-} 
+}

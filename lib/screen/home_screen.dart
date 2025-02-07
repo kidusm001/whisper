@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:whisper/features/profile/screens/profile_screen.dart';
-import 'package:whisper/features/services/social_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../features/models/post_model.dart';
+import '../providers/saved_posts_provider.dart'; // Import the provider
+import '../features/screens/comment_screen.dart';
+import '../providers/likes_provider.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   final VoidCallback toggleTheme;
 
   const HomeScreen({
@@ -11,216 +15,68 @@ class HomeScreen extends StatefulWidget {
   });
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
-  bool _isSidebarVisible = false;
-  final bool _isDarkMode = false;
-  bool _isSearchExpanded = false;
-  late AnimationController _animationController;
-  late Animation<double> _animation;
-  final SocialService _socialService = SocialService();
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-    _animation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    );
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  bool _isSidebarOpen = false;
 
   void _toggleSidebar() {
     setState(() {
-      _isSidebarVisible = !_isSidebarVisible;
-      if (_isSidebarVisible) {
-        _animationController.forward();
-      } else {
-        _animationController.reverse();
-      }
+      _isSidebarOpen = !_isSidebarOpen;
     });
   }
 
-  // Public method to toggle the sidebar
-  void toggleSidebar() {
-    _toggleSidebar();
-  }
-
-  Future<void> _followUser(String userId) async {
-    bool success = await _socialService.followUser('currentUserId', userId);
-    if (success) {
-      // Update UI or show a message
-    }
-  }
-
-  Future<void> _unfollowUser(String userId) async {
-    bool success = await _socialService.unfollowUser('currentUserId', userId);
-    if (success) {
-      // Update UI or show a message
-    }
+  void followUser(String userId) {
+    // Implement follow user logic here
+    print('Following user: $userId');
   }
 
   @override
   Widget build(BuildContext context) {
+    // Dummy data for demonstration; fixed second PostModel
+    final List<PostModel> posts = [
+      PostModel(
+        id: '1',
+        authorId: 'user1',
+        title: 'First Post',
+        content: 'This is the first post content.',
+        mediaUrls: [],
+        mediaType: 'text',
+        createdAt: DateTime.now(),
+      ),
+      PostModel(
+        id: '2',
+        authorId: 'user2',
+        title: 'Second Post',
+        content: 'This is the second post content.',
+        mediaUrls: [],
+        mediaType: 'text',
+        createdAt: DateTime.now(),
+      ),
+    ];
+
     final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: Row(
         children: [
-          Expanded(child: _buildMainFeed()),
+          Expanded(
+            child: ListView.builder(
+              itemCount: posts.length,
+              itemBuilder: (context, index) {
+                final post = posts[index];
+                return PostCard(
+                  post: post,
+                  followUser: followUser,
+                );
+              },
+            ),
+          ),
           if (MediaQuery.of(context).size.width > 1200) _buildRightSidebar(),
         ],
       ),
     );
-  }
-
-  PreferredSizeWidget _buildAppBar() {
-    final theme = Theme.of(context);
-    if (_isSearchExpanded) {
-      return AppBar(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        elevation: 1,
-        leading: IconButton(
-          icon: Icon(Icons.menu, color: theme.iconTheme.color),
-          onPressed: _toggleSidebar,
-        ),
-        title: TextField(
-          autofocus: true,
-          style: theme.textTheme.bodyLarge,
-          decoration: InputDecoration(
-            hintText: 'Search posts or creators...',
-            hintStyle:
-                theme.textTheme.bodyLarge?.copyWith(color: theme.hintColor),
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.close, color: theme.iconTheme.color),
-            onPressed: () {
-              setState(() {
-                _isSearchExpanded = false;
-              });
-            },
-          ),
-        ],
-      );
-    }
-
-    return AppBar(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      elevation: 1,
-      leading: IconButton(
-        icon: Icon(Icons.menu, color: theme.iconTheme.color),
-        onPressed: _toggleSidebar,
-      ),
-      title: const Text('Whisper'),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.search),
-          onPressed: () {
-            setState(() {
-              _isSearchExpanded = true;
-            });
-          },
-        ),
-        if (!_isSearchExpanded) ...[
-          IconButton(
-            icon: Icon(Icons.notifications_outlined,
-                color: theme.iconTheme.color),
-            onPressed: () {},
-          ),
-          const SizedBox(width: 8),
-          PopupMenuButton(
-            offset: const Offset(0, 45),
-            child: const CircleAvatar(
-              radius: 16,
-              backgroundImage: NetworkImage('https://placeholder.com/150x150'),
-            ),
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                child: ListTile(
-                  leading: const Icon(Icons.person),
-                  title: const Text('Profile'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const ProfileScreen()),
-                    );
-                  },
-                ),
-              ),
-              PopupMenuItem(
-                child: ListTile(
-                  leading: const Icon(Icons.card_membership),
-                  title: const Text('Subscription Plans'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.pushNamed(context, '/subscription-tiers');
-                  },
-                ),
-              ),
-              PopupMenuItem(
-                child: ListTile(
-                  leading: Icon(
-                    Theme.of(context).brightness == Brightness.light
-                        ? Icons.dark_mode
-                        : Icons.light_mode,
-                  ),
-                  title: Text(Theme.of(context).brightness == Brightness.light
-                      ? 'Dark Mode'
-                      : 'Light Mode'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    widget.toggleTheme();
-                  },
-                ),
-              ),
-              const PopupMenuItem(
-                child: ListTile(
-                  leading: Icon(Icons.settings),
-                  title: Text('Settings'),
-                ),
-              ),
-              const PopupMenuItem(
-                child: ListTile(
-                  leading: Icon(Icons.logout),
-                  title: Text('Logout'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 20),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildMainFeed() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: 10,
-      itemBuilder: (context, index) => _buildPostCard(),
-    );
-  }
-
-  Widget _buildPostCard() {
-    return PostCard(toggleTheme: widget.toggleTheme, followUser: _followUser);
   }
 
   Widget _buildRightSidebar() {
@@ -238,159 +94,173 @@ class _HomeScreenState extends State<HomeScreen>
                 ?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
-          // Add trending creators list here
+          // ...existing code or widgets for trending creators...
           Text(
             'Upcoming Events',
             style: theme.textTheme.titleLarge
                 ?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
-          // Add events list here
+          // ...existing code or widgets for upcoming events...
         ],
       ),
     );
   }
 }
 
-class PostCard extends StatefulWidget {
-  final VoidCallback toggleTheme;
-  final Future<void> Function(String) followUser;
-
+class PostCard extends ConsumerStatefulWidget {
   const PostCard({
     super.key,
-    required this.toggleTheme,
+    required this.post,
     required this.followUser,
   });
 
+  final PostModel post;
+  final Function(String) followUser;
+
   @override
-  State<PostCard> createState() => _PostCardState();
+  ConsumerState<PostCard> createState() => _PostCardState();
 }
 
-class _PostCardState extends State<PostCard> {
-  bool _isLiked = false;
-  int _likeCount = 0;
-  int _commentCount = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    // Initialize like count and comment count from data source
-    _likeCount = 10; // Example value
-    _commentCount = 5; // Example value
-  }
-
-  Future<void> _toggleLike() async {
-    setState(() {
-      _isLiked = !_isLiked;
-      _likeCount += _isLiked ? 1 : -1;
-    });
-    // Call social service to like/unlike post
-  }
-
+class _PostCardState extends ConsumerState<PostCard> {
   @override
   Widget build(BuildContext context) {
+    final isSaved =
+        ref.watch(savedPostsProvider.notifier).isPostSaved(widget.post);
+    final isLiked =
+        ref.watch(likesProvider).likedPosts[widget.post.id] ?? false;
+    final likeCount = ref.watch(likesProvider).likeCounts[widget.post.id] ??
+        widget.post.likesCount;
     final theme = Theme.of(context);
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      color: theme.cardColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ListTile(
-            leading: const CircleAvatar(
-              backgroundImage: NetworkImage('https://placeholder.com/50x50'),
-            ),
-            title: Text(
-              'Creator Name',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+      margin: const EdgeInsets.all(8.0),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundImage: NetworkImage('https://placeholder.com/50x50'),
+              ),
+              title: Text(
+                'Creator Name',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              subtitle: Text(
+                'Premium Member',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.hintColor,
+                ),
+              ),
+              trailing: IconButton(
+                icon: Icon(Icons.person_add, color: theme.iconTheme.color),
+                onPressed: () => widget.followUser('userId'),
               ),
             ),
-            subtitle: Text(
-              'Premium Member',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.hintColor,
-              ),
-            ),
-            trailing: IconButton(
-              icon: Icon(Icons.person_add, color: theme.iconTheme.color),
-              onPressed: () => widget.followUser('userId'),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Post Title Goes Here',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.post.title,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'This is a preview of the post content. Click to read more...',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.hintColor,
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.post.content,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.hintColor,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  height: 200,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Media Content',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.hintColor,
+                  const SizedBox(height: 16),
+                  Container(
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'Media Content',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.hintColor,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Divider(color: theme.dividerColor),
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: Icon(
-                    _isLiked ? Icons.favorite : Icons.favorite_border,
-                    color: theme.iconTheme.color,
+            Divider(color: theme.dividerColor),
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      isLiked ? Icons.favorite : Icons.favorite_border,
+                      color: isLiked ? Colors.red : theme.iconTheme.color,
+                    ),
+                    onPressed: () {
+                      ref.read(likesProvider.notifier).toggleLike(
+                            widget.post.id,
+                            widget.post.likesCount,
+                          );
+                    },
                   ),
-                  onPressed: _toggleLike,
-                ),
-                Text('$_likeCount Likes'),
-                IconButton(
-                  icon: Icon(Icons.comment_outlined,
-                      color: theme.iconTheme.color),
-                  onPressed: () {
-                    // Navigate to comment screen
-                  },
-                ),
-                Text('$_commentCount Comments'),
-                IconButton(
-                  icon: Icon(Icons.share, color: theme.iconTheme.color),
-                  onPressed: () {},
-                ),
-                IconButton(
-                  icon:
-                      Icon(Icons.bookmark_border, color: theme.iconTheme.color),
-                  onPressed: () {},
-                ),
-              ],
+                  Text('$likeCount Likes'),
+                  IconButton(
+                    icon: Icon(Icons.comment_outlined,
+                        color: theme.iconTheme.color),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              CommentScreen(post: widget.post),
+                        ),
+                      );
+                    },
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: Icon(
+                      isSaved ? Icons.bookmark : Icons.bookmark_border,
+                      color: isSaved
+                          ? Theme.of(context).colorScheme.primary
+                          : theme.iconTheme.color,
+                      size: isSaved ? 28 : 24,
+                    ),
+                    onPressed: () {
+                      final enrichedPost = PostModel(
+                        id: widget.post.id,
+                        authorId: widget.post.authorId,
+                        title: widget.post.title,
+                        content: widget.post.content,
+                        mediaUrls: widget.post.mediaUrls,
+                        mediaType: widget.post.mediaType,
+                        createdAt: widget.post.createdAt,
+                        authorName: 'Creator Name',
+                        likesCount: likeCount,
+                        commentsCount: widget.post.commentsCount,
+                      );
+                      ref
+                          .read(savedPostsProvider.notifier)
+                          .togglePost(enrichedPost);
+                    },
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

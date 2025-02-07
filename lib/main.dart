@@ -10,7 +10,7 @@ import 'screen/profile_setup_screen.dart';
 import 'screen/subscription_tiers_screen.dart';
 import 'screen/main_navigation_screen.dart';
 import 'features/profile/screens/create_post_screen.dart';
-import 'features/services/social_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,63 +47,65 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Whisper',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
-          brightness: Brightness.light,
+    return ProviderScope(
+      child: MaterialApp(
+        title: 'Whisper',
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.deepPurple,
+            brightness: Brightness.light,
+          ),
+          scaffoldBackgroundColor: Colors.white,
+          cardColor: Colors.white,
+          textTheme: const TextTheme().apply(
+            bodyColor: Colors.black,
+            displayColor: Colors.black,
+          ),
+          iconTheme: const IconThemeData(color: Colors.black),
+          dividerColor: Colors.grey[300],
+          hintColor: Colors.grey[600],
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black,
+            elevation: 0,
+          ),
+          useMaterial3: true,
         ),
-        scaffoldBackgroundColor: Colors.white,
-        cardColor: Colors.white,
-        textTheme: const TextTheme().apply(
-          bodyColor: Colors.black,
-          displayColor: Colors.black,
+        darkTheme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.deepPurple,
+            brightness: Brightness.dark,
+          ),
+          scaffoldBackgroundColor: Colors.black,
+          cardColor: const Color(0xFF1E1E1E),
+          textTheme: const TextTheme().apply(
+            bodyColor: Colors.white,
+            displayColor: Colors.white,
+          ),
+          iconTheme: const IconThemeData(color: Colors.white),
+          dividerColor: Colors.grey[800],
+          hintColor: Colors.grey[400],
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+            elevation: 0,
+          ),
+          useMaterial3: true,
         ),
-        iconTheme: const IconThemeData(color: Colors.black),
-        dividerColor: Colors.grey[300],
-        hintColor: Colors.grey[600],
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black,
-          elevation: 0,
-        ),
-        useMaterial3: true,
+        themeMode: _themeMode,
+        initialRoute: '/login',
+        routes: {
+          '/login': (context) => const LoginScreen(),
+          '/signup': (context) => const SignupScreen(),
+          '/home': (context) => HomeScreen(toggleTheme: toggleTheme),
+          '/profile-setup': (context) => const ProfileSetupScreen(),
+          '/profile': (context) => const ProfileScreen(),
+          '/subscription-tiers': (context) => const SubscriptionTiersScreen(),
+          '/main-navigation': (context) =>
+              MainNavigationScreen(toggleTheme: toggleTheme),
+          '/create-post': (context) => const CreatePostScreen(),
+        },
       ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
-          brightness: Brightness.dark,
-        ),
-        scaffoldBackgroundColor: Colors.black,
-        cardColor: const Color(0xFF1E1E1E),
-        textTheme: const TextTheme().apply(
-          bodyColor: Colors.white,
-          displayColor: Colors.white,
-        ),
-        iconTheme: const IconThemeData(color: Colors.white),
-        dividerColor: Colors.grey[800],
-        hintColor: Colors.grey[400],
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.black,
-          foregroundColor: Colors.white,
-          elevation: 0,
-        ),
-        useMaterial3: true,
-      ),
-      themeMode: _themeMode,
-      initialRoute: '/main-navigation',
-      routes: {
-        '/login': (context) => const LoginScreen(),
-        '/signup': (context) => const SignupScreen(),
-        '/home': (context) => HomeScreen(toggleTheme: toggleTheme),
-        '/profile-setup': (context) => const ProfileSetupScreen(),
-        '/profile': (context) => const ProfileScreen(),
-        '/subscription-tiers': (context) => const SubscriptionTiersScreen(),
-        '/main-navigation': (context) =>
-            MainNavigationScreen(toggleTheme: toggleTheme),
-        '/create-post': (context) => const CreatePostScreen(),
-      },
     );
   }
 }
