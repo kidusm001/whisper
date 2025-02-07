@@ -25,17 +25,27 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   bool _isPublished = true;
   String? _selectedTier;
   final List<String> _availableTiers = ['Free', 'Premium'];
+  bool _isLoading = false;
+  late BuildContext _stateContext;
+
+  @override
+  void initState() {
+    super.initState();
+    _stateContext = context;
+  }
 
   Future<void> _pickImage(ImageSource source) async {
     final pickedFile = await ImagePicker().pickImage(source: source);
     if (pickedFile != null) {
       if (kIsWeb) {
         final bytes = await pickedFile.readAsBytes();
+        if (!mounted) return;
         setState(() {
           _imageWeb = bytes;
           _image = null;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _image = File(pickedFile.path);
           _imageWeb = null;
@@ -52,9 +62,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Future<String?> _uploadImageToSupabase(
-    dynamic imageFile,
-    String imageType,
-    String userId) async {
+      dynamic imageFile, String imageType, String userId) async {
     if (imageFile == null) return null;
 
     final supabaseClient = Supabase.instance.client;
@@ -63,35 +71,37 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     final imagePath = '$userId/$imageType/$fileName';
 
     debugPrint("Uploading to path: $imagePath");
-    debugPrint("Current User UID (from FirebaseAuth): ${FirebaseAuth.instance.currentUser?.uid}");
+    debugPrint(
+        "Current User UID (from FirebaseAuth): ${FirebaseAuth.instance.currentUser?.uid}");
 
     try {
       if (imageFile is Uint8List) {
         await supabaseClient.storage.from('images').uploadBinary(
-          imagePath,
-          imageFile,
-          fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
-        );
+              imagePath,
+              imageFile,
+              fileOptions:
+                  const FileOptions(cacheControl: '3600', upsert: false),
+            );
       } else if (imageFile is File) {
         await supabaseClient.storage.from('images').upload(
-          imagePath,
-          imageFile,
-          fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
-        );
+              imagePath,
+              imageFile,
+              fileOptions:
+                  const FileOptions(cacheControl: '3600', upsert: false),
+            );
       } else {
         throw Exception('Unsupported image file type');
       }
 
       final publicUrl =
-      supabaseClient.storage.from('images').getPublicUrl(imagePath);
+          supabaseClient.storage.from('images').getPublicUrl(imagePath);
       return publicUrl;
     } catch (e) {
       debugPrint('Error uploading image: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading image: $e')),
-        );
-      }
+      if (!mounted) return null;
+      ScaffoldMessenger.of(_stateContext).showSnackBar(
+        SnackBar(content: Text('Error uploading image: $e')),
+      );
       return null;
     }
   }
@@ -99,15 +109,18 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   Future<void> _createPost() async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You must be logged in to create a post.')),
+      if (!mounted) return;
+      ScaffoldMessenger.of(_stateContext).showSnackBar(
+        const SnackBar(
+            content: Text('You must be logged in to create a post.')),
       );
       return;
     }
 
     // Show loading indicator
+    if (!mounted) return;
     showDialog(
-      context: context,
+      context: _stateContext,
       barrierDismissible: false, // Prevent user from dismissing
       builder: (context) => const Center(child: CircularProgressIndicator()),
     );
@@ -127,12 +140,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
         if (imageUrl == null) {
           // Handle image upload failure.  Don't create the post.
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to upload image.')),
-            );
-            Navigator.of(context).pop(); // Dismiss loading indicator
-          }
+          if (!mounted) return;
+          ScaffoldMessenger.of(_stateContext).showSnackBar(
+            const SnackBar(content: Text('Failed to upload image.')),
+          );
+          Navigator.of(_stateContext).pop(); // Dismiss loading indicator
           return; // Exit the function
         }
       }
@@ -154,22 +166,20 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       await addPostToFirestore(newPost);
 
       // Success message
-      if (context.mounted) {
-        Navigator.of(context).pop(); // Dismiss loading indicator
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Post created successfully!')),
-        );
-        // Optionally navigate back or clear the form
-        Navigator.of(context).pop(); // Go back to the previous screen
-      }
+      if (!mounted) return;
+      Navigator.of(_stateContext).pop(); // Dismiss loading indicator
+      ScaffoldMessenger.of(_stateContext).showSnackBar(
+        const SnackBar(content: Text('Post created successfully!')),
+      );
+      // Optionally navigate back or clear the form
+      Navigator.of(_stateContext).pop(); // Go back to the previous screen
     } catch (e) {
       // Error handling
-      if (context.mounted) {
-        Navigator.of(context).pop(); // Dismiss loading indicator
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to create post: $e')),
-        );
-      }
+      if (!mounted) return;
+      Navigator.of(_stateContext).pop(); // Dismiss loading indicator
+      ScaffoldMessenger.of(_stateContext).showSnackBar(
+        SnackBar(content: Text('Failed to create post: $e')),
+      );
     }
   }
 
@@ -184,6 +194,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   @override
   Widget build(BuildContext context) {
+    _stateContext = context; // Update context reference
     return Scaffold(
       appBar: AppBar(
         title: const Text('Create Post'),
@@ -245,14 +256,16 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     image: (_image != null || _imageWeb != null)
                         ? DecorationImage(
                             image: kIsWeb
-                                ? MemoryImage(_imageWeb!) as ImageProvider<Object>
+                                ? MemoryImage(_imageWeb!)
+                                    as ImageProvider<Object>
                                 : FileImage(_image!) as ImageProvider<Object>,
                             fit: BoxFit.cover,
                           )
                         : null,
                   ),
                   child: (_image == null && _imageWeb == null)
-                      ? const Icon(Icons.add_a_photo, size: 50, color: Colors.grey)
+                      ? const Icon(Icons.add_a_photo,
+                          size: 50, color: Colors.grey)
                       : null,
                 ),
               ),

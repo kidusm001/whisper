@@ -3,11 +3,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/signup_screen.dart';
-import 'screen/home_screen.dart';
 import 'features/profile/screens/profile_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screen/profile_setup_screen.dart';
 import 'utils/migrate_posts.dart';
+import 'widgets/bottom_nav_layout.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,7 +42,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignupScreen(),
-        '/home': (context) => const HomeScreen(),
+        '/home': (context) => const BottomNavLayout(), // Updated this line
         '/profile-setup': (context) => const ProfileSetupScreen(),
         '/profile': (context) => const ProfileScreen(),
       },

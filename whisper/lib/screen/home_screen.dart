@@ -8,7 +8,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   bool _isSidebarVisible = false;
   bool _isDarkMode = false;
   bool _isSearchExpanded = false;
@@ -55,10 +56,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           Row(
             children: [
               Expanded(child: _buildMainFeed()),
-              if (MediaQuery.of(context).size.width > 1200) _buildRightSidebar(),
             ],
           ),
-          if (_isSidebarVisible) 
+          if (_isSidebarVisible)
             AnimatedBuilder(
               animation: _animation,
               builder: (context, child) {
@@ -70,7 +70,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 );
               },
             ),
-          if (_isSidebarVisible) 
+          if (_isSidebarVisible)
             SlideTransition(
               position: Tween<Offset>(
                 begin: const Offset(-1, 0),
@@ -196,7 +196,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _buildLeftSidebar() {
     return Container(
       width: MediaQuery.of(context).size.width * 0.85,
-      height: MediaQuery.of(context).size.height,
       color: _isDarkMode ? Colors.grey[850] : Colors.white,
       child: Column(
         children: [
@@ -207,7 +206,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               children: [
                 const CircleAvatar(
                   radius: 30,
-                  backgroundImage: NetworkImage('https://placeholder.com/150x150'),
+                  backgroundImage:
+                      NetworkImage('https://placeholder.com/150x150'),
                 ),
                 const SizedBox(width: 16),
                 const Expanded(
@@ -233,11 +233,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
           ),
           const Divider(),
-          _buildSidebarItem(Icons.home, 'Home', isSelected: true),
           _buildSidebarItem(Icons.message, 'Messages'),
           _buildSidebarItem(Icons.group, 'My Memberships'),
           _buildSidebarItem(Icons.bookmark, 'Saved Posts'),
-          _buildSidebarItem(Icons.explore, 'Explore Creators'),
           const Spacer(),
           const Divider(),
           _buildSidebarItem(Icons.logout, 'Logout'),
@@ -247,7 +245,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildSidebarItem(IconData icon, String label, {bool isSelected = false}) {
+  Widget _buildSidebarItem(IconData icon, String label,
+      {bool isSelected = false}) {
     return ListTile(
       leading: Icon(icon, color: isSelected ? Colors.blue : null),
       title: Text(label),
@@ -349,31 +348,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRightSidebar() {
-    return Container(
-      width: 300,
-      color: _isDarkMode ? Colors.grey[850] : Colors.white,
-      padding: const EdgeInsets.all(16),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Trending Creators',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 16),
-          // Add trending creators list here
-          Text(
-            'Upcoming Events',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 16),
-          // Add events list here
         ],
       ),
     );
