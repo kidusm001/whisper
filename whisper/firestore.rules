@@ -10,18 +10,27 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Comments collection - Updated rules
+    // Comments collection - Updated rules to allow replies
     match /comments/{commentId} {
       allow read: if true;
+
+      // Allow users to create a comment or a reply
       allow create: if isAuthenticated() && 
-        request.resource.data.authorId == request.auth.uid;
+        request.resource.data.authorId == request.auth.uid &&
+        request.resource.data.postId is string &&
+        (
+          !request.resource.data.keys().hasAny(['parentId']) || 
+          request.resource.data.parentId is string
+        );
+
       allow update: if isAuthenticated() && (
-        // Allow original author to edit their comment
+        // Allow original author to edit their comment/reply
         request.auth.uid == resource.data.authorId ||
         // Allow likes updates by checking only likesCount and likedBy changes
         (request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['likesCount', 'likedBy']))
+          .hasOnly(['likesCount', 'likedBy', 'replyCount']))
       );
+
       allow delete: if isAuthenticated() && 
         request.auth.uid == resource.data.authorId;
     }
@@ -49,8 +58,17 @@ service cloud.firestore {
       // Comments subcollection
       match /comments/{commentId} {
         allow read: if true;
-        allow create: if isAuthenticated();
-        allow update, delete: if isAuthenticated() && resource.data.authorId == request.auth.uid;
+
+        // Allow users to create a comment or reply
+        allow create: if isAuthenticated() &&
+          request.resource.data.authorId == request.auth.uid &&
+          request.resource.data.postId is string &&
+          (
+            !request.resource.data.keys().hasAny(['parentId']) || 
+            request.resource.data.parentId is string
+          );
+
+        allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.authorId;
       }
       
       // Likes subcollection
@@ -93,16 +111,16 @@ service cloud.firestore {
       allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
     
-    // Chating part
+    // Chatting part
     match /chatRooms/{roomId} {
-  	match /messages/{messageId} {
-    allow read: if request.auth != null && 
-      roomId.split('_').contains(request.auth.uid);
-    allow create: if request.auth != null && 
-      roomId.split('_').contains(request.auth.uid) &&
-      request.resource.data.senderId == request.auth.uid;
-  }
-}
+      match /messages/{messageId} {
+        allow read: if request.auth != null && 
+          roomId.split('_').contains(request.auth.uid);
+        allow create: if request.auth != null && 
+          roomId.split('_').contains(request.auth.uid) &&
+          request.resource.data.senderId == request.auth.uid;
+      }
+    }
 
     // Tier access rules
     match /tiers/{tier} {
