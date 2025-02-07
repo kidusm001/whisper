@@ -19,22 +19,19 @@ class HomeScreen extends StatelessWidget {
         },
       ),
       drawer: const UniversalDrawer(),
-      body: _buildMainFeed(),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: 10,
+        itemBuilder: (context, index) =>
+            _buildPostCard(context), // pass context
+      ),
     );
   }
 
-  Widget _buildMainFeed() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: 10,
-      itemBuilder: (context, index) => _buildPostCard(),
-    );
-  }
-
-  Widget _buildPostCard() {
+  Widget _buildPostCard(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      color: Colors.white,
+      // Remove or update hardcoded background color to use theme
+      // color: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
       ),
@@ -45,16 +42,14 @@ class HomeScreen extends StatelessWidget {
             leading: CircleAvatar(
               backgroundImage: NetworkImage('https://placeholder.com/50x50'),
             ),
+            // Let the text style inherit the theme (remove explicit colors)
             title: Text(
               'Creator Name',
-              style: TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-              ),
+              // style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
             ),
             subtitle: Text(
               'Premium Member',
-              style: TextStyle(color: Colors.grey),
+              // style: TextStyle(color: Colors.grey),
             ),
           ),
           Padding(
@@ -62,18 +57,14 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Post Title Goes Here',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'This is a preview of the post content. Click to read more...',
-                  style: TextStyle(color: Colors.grey),
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 16),
                 Container(
@@ -98,19 +89,23 @@ class HomeScreen extends StatelessWidget {
             child: Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.favorite_border, color: Colors.black),
+                  icon: const Icon(Icons.favorite_border),
+                  color: Theme.of(context).iconTheme.color, // Use themed color
                   onPressed: () {},
                 ),
                 IconButton(
-                  icon: const Icon(Icons.comment_outlined, color: Colors.black),
+                  icon: const Icon(Icons.comment_outlined),
+                  color: Theme.of(context).iconTheme.color,
                   onPressed: () {},
                 ),
                 IconButton(
-                  icon: const Icon(Icons.share, color: Colors.black),
+                  icon: const Icon(Icons.share),
+                  color: Theme.of(context).iconTheme.color,
                   onPressed: () {},
                 ),
                 IconButton(
-                  icon: const Icon(Icons.bookmark_border, color: Colors.black),
+                  icon: const Icon(Icons.bookmark_border),
+                  color: Theme.of(context).iconTheme.color,
                   onPressed: () {},
                 ),
               ],
