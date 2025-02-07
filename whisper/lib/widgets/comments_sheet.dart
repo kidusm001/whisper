@@ -39,7 +39,8 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
   void _startReply(CommentModel comment) {
     setState(() {
       _replyingTo = comment;
-      _controller.text = '@${comment.authorName} ';
+      // Don't set text with @ mention, just focus the field
+      _controller.clear();
     });
     _controller.selection = TextSelection.fromPosition(
       TextPosition(offset: _controller.text.length),
