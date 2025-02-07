@@ -13,6 +13,11 @@ class CommentModel {
   final String content;
   final int likesCount;
   final List<String> likedBy;
+  final String? parentId; // ID of the parent comment if this is a reply
+  final String? replyToName; // Name of the user being replied to
+  final String? replyToId; // ID of the user being replied to
+  final int replyCount;
+  final String? authorRole; // Add this field
 
   @JsonKey(fromJson: _timestampFromJson, toJson: _timestampToJson)
   final DateTime createdAt;
@@ -27,6 +32,11 @@ class CommentModel {
     this.likesCount = 0,
     List<String>? likedBy,
     required this.createdAt,
+    this.parentId,
+    this.replyToName,
+    this.replyToId,
+    this.replyCount = 0,
+    this.authorRole, // Add this to constructor
   }) : likedBy = likedBy ?? [];
 
   factory CommentModel.fromJson(Map<String, dynamic> json) =>
