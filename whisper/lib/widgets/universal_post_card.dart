@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:whisper/widgets/comments_sheet.dart'; // NEW IMPORT
 
 class UniversalPostCard extends StatefulWidget {
   final Map<String, dynamic> postData;
@@ -10,10 +12,13 @@ class UniversalPostCard extends StatefulWidget {
   State<UniversalPostCard> createState() => _UniversalPostCardState();
 }
 
-class _UniversalPostCardState extends State<UniversalPostCard> {
+class _UniversalPostCardState extends State<UniversalPostCard>
+    with SingleTickerProviderStateMixin {
   bool _isFollowing = false;
   final _auth = FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
+  bool _isLiked = false;
+  bool _isSaved = false;
 
   @override
   void initState() {
@@ -77,137 +82,285 @@ class _UniversalPostCardState extends State<UniversalPostCard> {
     }
   }
 
+  void _confirmUnfollow() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Unfollow'),
+        content: const Text('Do you want to unfollow this user?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _unfollowUser();
+            },
+            child: const Text('Unfollow'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _unfollowUser() async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null || currentUser.uid == widget.postData['authorId']) {
+      return;
+    }
+    try {
+      final batch = _firestore.batch();
+      final followDocId = '${currentUser.uid}_${widget.postData['authorId']}';
+      final followDoc = _firestore.collection('follows').doc(followDocId);
+      batch.delete(followDoc);
+      final currentUserDoc =
+          _firestore.collection('users').doc(currentUser.uid);
+      final targetUserDoc =
+          _firestore.collection('users').doc(widget.postData['authorId']);
+      batch
+          .update(currentUserDoc, {'followingCount': FieldValue.increment(-1)});
+      batch.update(targetUserDoc, {'followerCount': FieldValue.increment(-1)});
+      await batch.commit();
+      if (mounted) {
+        setState(() {
+          _isFollowing = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to unfollow: ${e.toString()}')),
+      );
+    }
+  }
+
+  void _toggleComments() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => CommentsSheet(postId: widget.postData['id']),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Add debug print to see what data we're receiving
+    debugPrint('PostData received: ${widget.postData}');
+
     final currentUser = FirebaseAuth.instance.currentUser;
-    // Move mediaUrls declaration out of the children list
     final mediaUrls = (widget.postData['mediaUrls'] as List<dynamic>?) ?? [];
-    final bool showFollow =
-        currentUser != null && currentUser.uid != widget.postData['authorId'];
 
-    // Compute displayName fallback from postData
-    final String postDisplayName =
-        (((widget.postData['authorName'] as String?) ?? '').trim().isNotEmpty
-                    ? (widget.postData['authorName'] as String).trim()
-                    : (((widget.postData['displayName'] as String?) ?? '')
-                        .trim()))
-                .isNotEmpty
-            ? (((widget.postData['authorName'] as String?) ?? '')
-                    .trim()
-                    .isNotEmpty
-                ? (widget.postData['authorName'] as String).trim()
-                : (widget.postData['displayName'] as String).trim())
-            : "Anonymous";
+    // Use FutureBuilder to get user data if not in post
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.postData['authorId'])
+          .get(),
+      builder: (context, userSnapshot) {
+        debugPrint('User data snapshot: ${userSnapshot.data?.data()}');
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header with author info using FutureBuilder to fetch user details if missing
-          ListTile(
-            leading: CircleAvatar(
-              backgroundImage: NetworkImage(widget.postData['authorImage'] ??
-                  'https://placeholder.com/50x50'),
-            ),
-            title: FutureBuilder<DocumentSnapshot>(
-              future: FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(widget.postData['authorId'])
-                  .get(),
-              builder: (context, snapshot) {
-                if (snapshot.hasData && snapshot.data!.exists) {
-                  final data = snapshot.data!.data() as Map<String, dynamic>;
-                  final name = ((data['displayName'] as String?) ?? '').trim();
-                  return Text(
-                    name.isNotEmpty ? name : postDisplayName,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, color: Colors.black),
-                  );
-                }
-                return Text(
-                  postDisplayName,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, color: Colors.black),
-                );
-              },
-            ),
-            subtitle: Text(
-              widget.postData['role'] ?? 'Member',
-              style: const TextStyle(color: Colors.grey),
-            ),
-            trailing: showFollow
-                ? TextButton(
-                    onPressed: _isFollowing ? null : _followUser,
-                    child: Text(
-                      _isFollowing ? 'Following' : 'Follow',
-                      style: TextStyle(
-                        color: _isFollowing ? Colors.grey : Colors.blue,
+        // Combine post data with user data for display name
+        final userData =
+            userSnapshot.data?.data() as Map<String, dynamic>? ?? {};
+        final String postDisplayName =
+            widget.postData['authorName']?.toString().trim() ??
+                userData['displayName']?.toString().trim() ??
+                userData['username']?.toString().trim() ??
+                'Anonymous';
+
+        // NEW: Fixed profile image logic with proper null handling
+        final String profileImage = [
+          if (widget.postData['authorImage'] != null)
+            widget.postData['authorImage'] as String,
+          if (userData['photoUrl'] != null) userData['photoUrl'] as String,
+          if (userData['photoURL'] != null) userData['photoURL'] as String,
+          if (userData['profileImage'] != null)
+            userData['profileImage'] as String,
+          if (userData['avatar'] != null) userData['avatar'] as String,
+          if (userData['coverImage'] != null) userData['coverImage'] as String,
+        ].firstWhere((image) => image.trim().isNotEmpty,
+            orElse: () =>
+                'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y');
+
+        debugPrint('Using profile image: $profileImage');
+
+        final bool showFollow = currentUser != null &&
+            currentUser.uid != widget.postData['authorId'];
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.primary,
+                          width: 2,
+                        ),
+                      ),
+                      child: CircleAvatar(
+                        radius: 20,
+                        backgroundImage: NetworkImage(profileImage),
                       ),
                     ),
-                  )
-                : null,
-          ),
-          // Post title and content
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (widget.postData['title'] != null)
-                  Text(
-                    widget.postData['title'],
-                    style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black),
-                  ),
-                const SizedBox(height: 8),
-                if (widget.postData['content'] != null)
-                  Text(
-                    widget.postData['content'],
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-              ],
-            ),
-          ),
-          // Media content if exists (mediaUrls declared above)
-          if (mediaUrls.isNotEmpty)
-            Container(
-              height: 200,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                image: DecorationImage(
-                  image: NetworkImage(mediaUrls.first),
-                  fit: BoxFit.cover,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            postDisplayName,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          Text(
+                            widget.postData['role'] ??
+                                userData['role'] ??
+                                'Member',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (showFollow)
+                      ElevatedButton(
+                        onPressed:
+                            _isFollowing ? _confirmUnfollow : _followUser,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _isFollowing
+                              ? Colors.grey.shade200
+                              : Theme.of(context).colorScheme.primary,
+                          foregroundColor:
+                              _isFollowing ? Colors.grey : Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                        ),
+                        child: Text(_isFollowing ? 'Following' : 'Follow'),
+                      ),
+                  ],
                 ),
               ),
-            ),
-          // Action buttons
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.favorite_border, color: Colors.black),
-                  onPressed: () {},
+              if (mediaUrls.isNotEmpty)
+                Container(
+                  height: 300,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    image: DecorationImage(
+                      image: NetworkImage(mediaUrls.first),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.comment_outlined, color: Colors.black),
-                  onPressed: () {},
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (widget.postData['title'] != null) ...[
+                      Text(
+                        widget.postData['title'],
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    if (widget.postData['content'] != null)
+                      Text(
+                        widget.postData['content'],
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                  ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.share, color: Colors.black),
-                  onPressed: () {},
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        _ActionButton(
+                          icon: _isLiked
+                              ? CupertinoIcons.heart_fill
+                              : CupertinoIcons.heart,
+                          color: _isLiked ? Colors.red : Colors.black,
+                          onTap: () => setState(() => _isLiked = !_isLiked),
+                          count: widget.postData['likeCount'] ?? 0,
+                        ),
+                        const SizedBox(width: 16),
+                        _ActionButton(
+                          icon: CupertinoIcons.chat_bubble,
+                          onTap: _toggleComments,
+                          count: widget.postData['commentCount'] ?? 0,
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        _ActionButton(
+                          icon: CupertinoIcons.share,
+                          onTap: () {},
+                        ),
+                        const SizedBox(width: 16),
+                        _ActionButton(
+                          icon: _isSaved
+                              ? CupertinoIcons.bookmark_fill
+                              : CupertinoIcons.bookmark,
+                          onTap: () => setState(() => _isSaved = !_isSaved),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.bookmark_border, color: Colors.black),
-                  onPressed: () {},
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 12),
+            ],
           ),
+        );
+      },
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color? color;
+  final int? count;
+
+  const _ActionButton({
+    required this.icon,
+    required this.onTap,
+    this.color,
+    this.count,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Row(
+        children: [
+          Icon(icon, size: 24, color: color ?? Colors.black87),
+          if (count != null) ...[
+            const SizedBox(width: 4),
+            Text(
+              count.toString(),
+              style: TextStyle(
+                color: color ?? Colors.black87,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ],
       ),
     );
