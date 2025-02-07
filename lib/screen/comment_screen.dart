@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../features/models/post_model.dart';
-import '../../features/models/comment_model.dart';
-import '../../providers/comments_provider.dart';
-import '../../providers/comment_likes_provider.dart';
+import '../features/models/post_model.dart';
+import '../features/models/comment_model.dart';
+import '../providers/comments_provider.dart';
+import '../providers/comment_likes_provider.dart';
 
 class CommentScreen extends ConsumerStatefulWidget {
   final PostModel post;

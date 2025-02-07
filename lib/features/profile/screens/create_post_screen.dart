@@ -5,24 +5,44 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
+import '../../../features/models/post_model.dart';
+import '../../../providers/posts_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 export 'create_post_screen.dart' show CreatePostScreen;
 
-class CreatePostScreen extends StatefulWidget {
-  const CreatePostScreen({super.key});
+class CreatePostScreen extends ConsumerStatefulWidget {
+  final PostModel? post;
+
+  const CreatePostScreen({super.key, this.post});
 
   @override
-  State<CreatePostScreen> createState() => _CreatePostScreenState();
+  ConsumerState<CreatePostScreen> createState() => _CreatePostScreenState();
 }
 
-class _CreatePostScreenState extends State<CreatePostScreen> {
+class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
   File? _image;
   Uint8List? _imageWeb;
   bool _isPublished = true;
   String? _selectedTier;
-  final List<String> _availableTiers = ['Free', 'Premium'];
+  bool _isLoading = false;
+  final List<String> _availableTiers = ['basic', 'premium', 'vip'];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.post != null) {
+      _titleController.text = widget.post!.title;
+      _contentController.text = widget.post!.content;
+      _selectedTier = widget.post!.tier;
+      _isPublished = widget.post!.isPublished;
+    }
+  }
 
   Future<void> _pickImage(ImageSource source) async {
     final pickedFile = await ImagePicker().pickImage(source: source);
@@ -42,22 +62,143 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _contentController.dispose();
-    super.dispose();
+  Future<String?> _uploadImageToSupabase(
+      dynamic imageFile, String userId) async {
+    if (imageFile == null) return null;
+
+    final supabaseClient = supabase.Supabase.instance.client;
+    final fileName =
+        '${userId}_post_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final imagePath = '$userId/posts/$fileName';
+
+    try {
+      if (imageFile is Uint8List) {
+        await supabaseClient.storage.from('images').uploadBinary(
+              imagePath,
+              imageFile,
+              fileOptions: const supabase.FileOptions(
+                  cacheControl: '3600', upsert: false),
+            );
+      } else if (imageFile is File) {
+        await supabaseClient.storage.from('images').upload(
+              imagePath,
+              imageFile,
+              fileOptions: const supabase.FileOptions(
+                  cacheControl: '3600', upsert: false),
+            );
+      }
+
+      final publicUrl =
+          supabaseClient.storage.from('images').getPublicUrl(imagePath);
+      return publicUrl;
+    } catch (e) {
+      debugPrint('Error uploading image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading image: $e')),
+        );
+      }
+      return null;
+    }
   }
 
   Future<void> _createPost() async {
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) {
+    if (_titleController.text.trim().isEmpty ||
+        _contentController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('You must be logged in to create a post.')),
+        const SnackBar(content: Text('Please fill in all fields')),
       );
       return;
     }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('You must be logged in to create a post.')),
+        );
+        return;
+      }
+
+      // Get user data from Firestore
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+
+      if (!userDoc.exists) {
+        throw Exception('User data not found');
+      }
+
+      final userData = userDoc.data()!;
+      final userName = userData['displayName'] ?? 'Anonymous';
+
+      // Upload image if selected
+      String? imageUrl;
+      if (_image != null || _imageWeb != null) {
+        imageUrl = await _uploadImageToSupabase(
+          kIsWeb ? _imageWeb : _image,
+          currentUser.uid,
+        );
+      }
+
+      final postId = widget.post?.id ?? const Uuid().v4();
+      final newPost = PostModel(
+        id: postId,
+        authorId: currentUser.uid,
+        authorName: userName,
+        title: _titleController.text.trim(),
+        content: _contentController.text.trim(),
+        mediaUrls: imageUrl != null ? [imageUrl] : widget.post?.mediaUrls ?? [],
+        mediaType: imageUrl != null ? 'image' : 'text',
+        likesCount: widget.post?.likesCount ?? 0,
+        commentsCount: widget.post?.commentsCount ?? 0,
+        tier: _selectedTier,
+        isPublished: _isPublished,
+        createdAt: widget.post?.createdAt ?? DateTime.now(),
+      );
+
+      if (widget.post != null) {
+        await _updatePost(newPost);
+      } else {
+        await _createNewPost(newPost);
+      }
+
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error creating post: $e')),
+        );
+      }
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _updatePost(PostModel post) async {
+    await FirebaseFirestore.instance
+        .collection('posts')
+        .doc(post.id)
+        .update(post.toJson());
+  }
+
+  Future<void> _createNewPost(PostModel post) async {
+    final batch = FirebaseFirestore.instance.batch();
+
+    final postRef = FirebaseFirestore.instance.collection('posts').doc(post.id);
+    final userRef =
+        FirebaseFirestore.instance.collection('users').doc(post.authorId);
+
+    batch.set(postRef, post.toJson());
+    batch.update(userRef, {'postsCount': FieldValue.increment(1)});
+
+    await batch.commit();
   }
 
   @override
@@ -65,58 +206,57 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Post'),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
+        title: Text(widget.post != null ? 'Edit Post' : 'Create Post'),
         actions: [
-          TextButton(
-            onPressed: _createPost,
-            child: Text(
-              'Post',
-              style:
-                  TextStyle(color: theme.colorScheme.onPrimary, fontSize: 16),
+          if (_isLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: TextButton(
+                onPressed: _createPost,
+                child: Text(
+                  widget.post != null ? 'Save' : 'Post',
+                  style: TextStyle(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
             ),
-          ),
         ],
       ),
-      backgroundColor: theme.scaffoldBackgroundColor,
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: theme.colorScheme.surface,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: _titleController,
-                      style: theme.textTheme.bodyLarge,
-                      decoration: InputDecoration(
-                        hintText: 'Title',
-                        hintStyle: TextStyle(color: theme.hintColor),
-                        border: InputBorder.none,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
               TextField(
-                controller: _contentController,
-                style: theme.textTheme.bodyLarge,
+                controller: _titleController,
+                style: theme.textTheme.titleLarge,
                 decoration: InputDecoration(
-                  hintText: 'Write a caption...',
+                  hintText: 'Title',
                   hintStyle: TextStyle(color: theme.hintColor),
                   border: InputBorder.none,
                 ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _contentController,
+                style: theme.textTheme.bodyLarge,
                 maxLines: null,
-                keyboardType: TextInputType.multiline,
+                decoration: InputDecoration(
+                  hintText: 'Write your post...',
+                  hintStyle: TextStyle(color: theme.hintColor),
+                  border: InputBorder.none,
+                ),
               ),
               const SizedBox(height: 20),
               GestureDetector(
@@ -130,39 +270,47 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     image: (_image != null || _imageWeb != null)
                         ? DecorationImage(
                             image: kIsWeb
-                                ? MemoryImage(_imageWeb!)
-                                    as ImageProvider<Object>
-                                : FileImage(_image!) as ImageProvider<Object>,
+                                ? MemoryImage(_imageWeb!) as ImageProvider
+                                : FileImage(_image!) as ImageProvider,
                             fit: BoxFit.cover,
                           )
-                        : null,
+                        : widget.post?.mediaUrls.isNotEmpty == true
+                            ? DecorationImage(
+                                image:
+                                    NetworkImage(widget.post!.mediaUrls.first),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
                   ),
-                  child: (_image == null && _imageWeb == null)
-                      ? Icon(Icons.add_a_photo,
-                          size: 50, color: theme.hintColor)
+                  child: (_image == null &&
+                          _imageWeb == null &&
+                          widget.post?.mediaUrls.isEmpty != false)
+                      ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_a_photo,
+                                size: 50, color: theme.hintColor),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Add Image',
+                              style: TextStyle(color: theme.hintColor),
+                            ),
+                          ],
+                        )
                       : null,
                 ),
               ),
               const SizedBox(height: 20),
               DropdownButtonFormField<String>(
                 value: _selectedTier,
-                style: theme.textTheme.bodyLarge,
-                dropdownColor: theme.cardColor,
                 decoration: InputDecoration(
-                  labelText: 'Select Tier (Optional)',
-                  labelStyle: TextStyle(color: theme.hintColor),
+                  labelText: 'Select Tier',
                   border: const OutlineInputBorder(),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: theme.colorScheme.primary),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: theme.dividerColor),
-                  ),
                 ),
                 items: _availableTiers.map((String tier) {
                   return DropdownMenuItem<String>(
                     value: tier,
-                    child: Text(tier),
+                    child: Text(tier.toUpperCase()),
                   );
                 }).toList(),
                 onChanged: (value) {
@@ -171,16 +319,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   });
                 },
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
               Row(
                 children: [
-                  Text(
-                    'Publish Post',
-                    style: theme.textTheme.bodyLarge,
-                  ),
+                  Text('Publish Post', style: theme.textTheme.titleMedium),
+                  const Spacer(),
                   Switch(
                     value: _isPublished,
-                    activeColor: theme.colorScheme.primary,
                     onChanged: (value) {
                       setState(() {
                         _isPublished = value;
@@ -194,5 +339,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _contentController.dispose();
+    super.dispose();
   }
 }

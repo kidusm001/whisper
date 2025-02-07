@@ -1,23 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../screen/home_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'home_screen.dart';
 import 'messages_screen.dart';
 import 'membership_screen.dart';
 import 'saved_posts_screen.dart';
 import 'explore_creators_screen.dart';
 
-class MainNavigationScreen extends StatefulWidget {
+class MainNavigationScreen extends ConsumerStatefulWidget {
   final VoidCallback toggleTheme;
   const MainNavigationScreen({super.key, required this.toggleTheme});
 
   @override
-  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+  ConsumerState<MainNavigationScreen> createState() =>
+      _MainNavigationScreenState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> {
+class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   int _selectedIndex = 0;
-  List<Widget> _screens = []; // Initialize once
-
+  List<Widget> _screens = [];
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _isSearching = false;
   final _searchController = TextEditingController();
@@ -38,9 +39,19 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     setState(() {
       _selectedIndex = index;
     });
-    if (_scaffoldKey.currentState!.isDrawerOpen) {
+    if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
       Navigator.pop(context);
     }
+  }
+
+  Future<bool> _onWillPop() async {
+    if (_selectedIndex != 0) {
+      setState(() {
+        _selectedIndex = 0;
+      });
+      return false;
+    }
+    return true;
   }
 
   Future<void> _handleLogout() async {
@@ -62,113 +73,149 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      key: _scaffoldKey,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.menu),
-          onPressed: () {
-            _scaffoldKey.currentState?.openDrawer();
-          },
-        ),
-        title: _isSearching
-            ? TextField(
-                controller: _searchController,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: 'Search...',
-                  border: InputBorder.none,
-                  hintStyle: TextStyle(color: Theme.of(context).hintColor),
-                ),
-                style: Theme.of(context).textTheme.bodyLarge,
-              )
-            : Text(_getScreenTitle()),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Icon(_isSearching ? Icons.close : Icons.search),
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        key: _scaffoldKey,
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.menu),
             onPressed: () {
-              setState(() {
-                if (_isSearching) {
-                  _searchController.clear();
-                }
-                _isSearching = !_isSearching;
-              });
+              _scaffoldKey.currentState?.openDrawer();
             },
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: GestureDetector(
-              onTap: () => Navigator.pushNamed(context, '/profile'),
-              child: const CircleAvatar(
-                radius: 16,
-                backgroundImage:
-                    NetworkImage('https://placeholder.com/150x150'),
-              ),
-            ),
-          ),
-        ],
-      ),
-      drawer: Drawer(
-        width: 210,
-        child: Column(
-          children: [
-            DrawerHeader(
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withOpacity(0.1),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundColor: Theme.of(context).primaryColor,
-                    child:
-                        const Icon(Icons.person, size: 30, color: Colors.white),
+          title: _isSearching
+              ? TextField(
+                  controller: _searchController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: 'Search...',
+                    border: InputBorder.none,
+                    hintStyle: TextStyle(color: Theme.of(context).hintColor),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'User Name',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
+                  style: Theme.of(context).textTheme.bodyLarge,
+                )
+              : Text(_getScreenTitle()),
+          centerTitle: true,
+          actions: [
+            IconButton(
+              icon: Icon(_isSearching ? Icons.close : Icons.search),
+              onPressed: () {
+                setState(() {
+                  if (_isSearching) {
+                    _searchController.clear();
+                  }
+                  _isSearching = !_isSearching;
+                });
+              },
             ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(8.0),
-                children: [
-                  _buildDrawerItem(icon: Icons.home, title: 'Home', index: 0),
-                  _buildDrawerItem(
-                      icon: Icons.explore, title: 'Explore', index: 1),
-                  _buildDrawerItem(
-                      icon: Icons.message, title: 'Messages', index: 2),
-                  _buildDrawerItem(
-                      icon: Icons.group, title: 'Memberships', index: 3),
-                  _buildDrawerItem(
-                      icon: Icons.bookmark, title: 'Saved', index: 4),
-                  const Divider(),
-                  ListTile(
-                    leading:
-                        Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode),
-                    title: Text('${isDarkMode ? "Light" : "Dark"} Mode'),
-                    onTap: widget.toggleTheme,
-                  ),
-                ],
+            Padding(
+              padding: const EdgeInsets.only(right: 16.0),
+              child: GestureDetector(
+                onTap: () => Navigator.pushNamed(context, '/profile'),
+                child: const CircleAvatar(
+                  radius: 16,
+                  backgroundImage:
+                      NetworkImage('https://placeholder.com/150x150'),
+                ),
               ),
-            ),
-            const Divider(height: 0),
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text('Logout', style: TextStyle(color: Colors.red)),
-              onTap: _handleLogout,
             ),
           ],
         ),
-      ),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
+        drawer: Drawer(
+          width: 210,
+          child: Column(
+            children: [
+              DrawerHeader(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).primaryColor.withOpacity(0.1),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundColor: Theme.of(context).primaryColor,
+                      child: const Icon(Icons.person,
+                          size: 30, color: Colors.white),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'User Name',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(8.0),
+                  children: [
+                    _buildDrawerItem(icon: Icons.home, title: 'Home', index: 0),
+                    _buildDrawerItem(
+                        icon: Icons.explore, title: 'Explore', index: 1),
+                    _buildDrawerItem(
+                        icon: Icons.message, title: 'Messages', index: 2),
+                    _buildDrawerItem(
+                        icon: Icons.group, title: 'Memberships', index: 3),
+                    _buildDrawerItem(
+                        icon: Icons.bookmark, title: 'Saved', index: 4),
+                    const Divider(),
+                    ListTile(
+                      leading:
+                          Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode),
+                      title: Text('${isDarkMode ? "Light" : "Dark"} Mode'),
+                      onTap: widget.toggleTheme,
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 0),
+              ListTile(
+                leading: const Icon(Icons.logout, color: Colors.red),
+                title:
+                    const Text('Logout', style: TextStyle(color: Colors.red)),
+                onTap: _handleLogout,
+              ),
+            ],
+          ),
+        ),
+        body: IndexedStack(
+          index: _selectedIndex,
+          children: _screens,
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _selectedIndex,
+          onDestinationSelected: _onItemTapped,
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.explore_outlined),
+              selectedIcon: Icon(Icons.explore),
+              label: 'Explore',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.message_outlined),
+              selectedIcon: Icon(Icons.message),
+              label: 'Messages',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.card_membership_outlined),
+              selectedIcon: Icon(Icons.card_membership),
+              label: 'Memberships',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.bookmark_outline),
+              selectedIcon: Icon(Icons.bookmark),
+              label: 'Saved',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -187,7 +234,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final isSelected = index == _selectedIndex;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    // Use lighter purple in dark mode
     final selectedColor = isDarkMode
         ? const Color(0xFF9D6FFF) // Light purple for dark mode
         : const Color(0xFF320064); // Dark purple for light mode

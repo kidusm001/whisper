@@ -35,10 +35,28 @@ class _ProfileScreenState extends State<ProfileScreen>
   Uint8List? _profileImageWeb;
   Uint8List? _coverImageWeb;
 
+  UserModel? user;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+      if (doc.exists) {
+        setState(() {
+          user = UserModel.fromJson(doc.data()!);
+        });
+      }
+    }
   }
 
   @override
@@ -304,7 +322,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                         color: Colors.transparent,
                         child: IconButton(
                           icon: Icon(Icons.arrow_back,
-                              color: Theme.of(context).brightness == Brightness.light
+                              color: Theme.of(context).brightness ==
+                                      Brightness.light
                                   ? Colors.black
                                   : Colors.white),
                           onPressed: () => Navigator.of(context).pop(),
@@ -324,7 +343,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                               )
                             : IconButton(
                                 icon: Icon(Icons.edit,
-                                    color: Theme.of(context).brightness == Brightness.light
+                                    color: Theme.of(context).brightness ==
+                                            Brightness.light
                                         ? Colors.black
                                         : Colors.white),
                                 onPressed: () {
@@ -431,14 +451,102 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildPostCard(PostModel post) {
+    final theme = Theme.of(context);
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          ListTile(
+            leading: CircleAvatar(
+              backgroundImage: NetworkImage(
+                  post.authorId == FirebaseAuth.instance.currentUser?.uid
+                      ? user?.photoUrl ?? 'https://placeholder.com/50x50'
+                      : 'https://placeholder.com/50x50'),
+            ),
+            title: Text(
+              post.authorName ?? 'Anonymous',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            subtitle: post.tier != null
+                ? Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _getTierColor(post.tier!).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _getTierColor(post.tier!)),
+                    ),
+                    child: Text(
+                      post.tier!.toUpperCase(),
+                      style: TextStyle(
+                        color: _getTierColor(post.tier!),
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  )
+                : null,
+            trailing: PopupMenuButton<String>(
+              icon: Icon(Icons.more_vert, color: theme.hintColor),
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, color: theme.iconTheme.color),
+                      const SizedBox(width: 8),
+                      const Text('Edit'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.delete, color: Colors.red),
+                      const SizedBox(width: 8),
+                      const Text('Delete', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
+              onSelected: (value) {
+                if (value == 'edit') {
+                  _editPost(post);
+                } else if (value == 'delete') {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Delete Post'),
+                      content: const Text(
+                          'Are you sure you want to delete this post?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            _deletePost(post.id);
+                            Navigator.pop(context);
+                          },
+                          child: const Text('Delete',
+                              style: TextStyle(color: Colors.red)),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
           if (post.mediaUrls.isNotEmpty)
             Container(
               height: 200,
+              width: double.infinity,
               decoration: BoxDecoration(
                 image: DecorationImage(
                   image: NetworkImage(post.mediaUrls.first),
@@ -453,19 +561,46 @@ class _ProfileScreenState extends State<ProfileScreen>
               children: [
                 Text(
                   post.title,
-                  style: const TextStyle(
-                    fontSize: 18,
+                  style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(post.content),
-                const SizedBox(height: 8),
+                Text(
+                  post.content,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.hintColor,
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Row(
                   children: [
-                    Text('${post.likesCount} likes'),
+                    Icon(Icons.favorite_border,
+                        size: 16, color: theme.hintColor),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${post.likesCount} likes',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.hintColor,
+                      ),
+                    ),
                     const SizedBox(width: 16),
-                    Text('${post.commentsCount} comments'),
+                    Icon(Icons.comment_outlined,
+                        size: 16, color: theme.hintColor),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${post.commentsCount} comments',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.hintColor,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      _formatDate(post.createdAt),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.hintColor,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -474,6 +609,19 @@ class _ProfileScreenState extends State<ProfileScreen>
         ],
       ),
     );
+  }
+
+  Color _getTierColor(String tier) {
+    switch (tier.toLowerCase()) {
+      case 'basic':
+        return Colors.blue;
+      case 'premium':
+        return Colors.purple;
+      case 'vip':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
   }
 
   Widget _buildSubscriptionsTab(String userId) {
@@ -748,6 +896,49 @@ class _ProfileScreenState extends State<ProfileScreen>
       }
     } catch (e) {
       debugPrint('Error creating user document: $e');
+    }
+  }
+
+  Future<void> _editPost(PostModel post) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreatePostScreen(post: post),
+      ),
+    );
+
+    if (result == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Post updated successfully')),
+      );
+    }
+  }
+
+  Future<void> _deletePost(String postId) async {
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      final postRef =
+          FirebaseFirestore.instance.collection('posts').doc(postId);
+      final userRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(FirebaseAuth.instance.currentUser?.uid);
+
+      batch.delete(postRef);
+      batch.update(userRef, {'postsCount': FieldValue.increment(-1)});
+
+      await batch.commit();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Post deleted successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting post: $e')),
+        );
+      }
     }
   }
 

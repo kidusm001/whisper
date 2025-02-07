@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/saved_posts_provider.dart';
 import '../providers/likes_provider.dart';
-import '../features/screens/comment_screen.dart';
+import 'comment_screen.dart';
 
 class SavedPostsScreen extends ConsumerWidget {
   const SavedPostsScreen({Key? key}) : super(key: key);
