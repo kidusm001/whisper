@@ -1,7 +1,5 @@
 # Whisper - Exclusive Content Platform
 
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-
 A social content platform empowering creators to share exclusive content and build engaged communities. Built with Flutter and Firebase/Supabase backend.
 
 ![Whisper App Preview](docs/assets/app-preview.png) <!-- Add actual screenshot later -->
