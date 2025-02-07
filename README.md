@@ -76,10 +76,6 @@ Includes:
 We welcome contributions! Please see:  
 [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-## License 📄
-
-MIT License - See [LICENSE](LICENSE) for details.
-
 ---
 
 **Whisper Inc.** © 2025 - Building meaningful creator communities
