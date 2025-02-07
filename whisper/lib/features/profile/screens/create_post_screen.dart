@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 import 'package:whisper/features/models/post_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // <-- NEW import
 
 class CreatePostScreen extends StatefulWidget {
   const CreatePostScreen({super.key});
@@ -51,9 +52,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Future<String?> _uploadImageToSupabase(
-    dynamic imageFile,
-    String imageType,
-    String userId) async {
+      dynamic imageFile, String imageType, String userId) async {
     if (imageFile == null) return null;
 
     final supabaseClient = Supabase.instance.client;
@@ -62,27 +61,30 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     final imagePath = '$userId/$imageType/$fileName';
 
     debugPrint("Uploading to path: $imagePath");
-    debugPrint("Current User UID (from FirebaseAuth): ${FirebaseAuth.instance.currentUser?.uid}");
+    debugPrint(
+        "Current User UID (from FirebaseAuth): ${FirebaseAuth.instance.currentUser?.uid}");
 
     try {
       if (imageFile is Uint8List) {
         await supabaseClient.storage.from('images').uploadBinary(
-          imagePath,
-          imageFile,
-          fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
-        );
+              imagePath,
+              imageFile,
+              fileOptions:
+                  const FileOptions(cacheControl: '3600', upsert: false),
+            );
       } else if (imageFile is File) {
         await supabaseClient.storage.from('images').upload(
-          imagePath,
-          imageFile,
-          fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
-        );
+              imagePath,
+              imageFile,
+              fileOptions:
+                  const FileOptions(cacheControl: '3600', upsert: false),
+            );
       } else {
         throw Exception('Unsupported image file type');
       }
 
       final publicUrl =
-      supabaseClient.storage.from('images').getPublicUrl(imagePath);
+          supabaseClient.storage.from('images').getPublicUrl(imagePath);
       return publicUrl;
     } catch (e) {
       debugPrint('Error uploading image: $e');
@@ -99,7 +101,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You must be logged in to create a post.')),
+        const SnackBar(
+            content: Text('You must be logged in to create a post.')),
       );
       return;
     }
@@ -173,11 +176,21 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Future<void> addPostToFirestore(PostModel post) async {
-    final supabaseClient = Supabase.instance.client;
+    final firestore = FirebaseFirestore.instance;
+    final batch = firestore.batch();
+
+    // Add the post document
+    final postRef = firestore.collection('posts').doc(post.id);
+    batch.set(postRef, post.toJson());
+
+    // Increment the user's post count
+    final userRef = firestore.collection('users').doc(post.authorId);
+    batch.update(userRef, {'postsCount': FieldValue.increment(1)});
 
     try {
-      await supabaseClient.from('posts').upsert(post.toJson());
+      await batch.commit();
     } catch (e) {
+      debugPrint('Error creating post: $e');
       rethrow;
     }
   }
@@ -245,14 +258,16 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     image: (_image != null || _imageWeb != null)
                         ? DecorationImage(
                             image: kIsWeb
-                                ? MemoryImage(_imageWeb!) as ImageProvider<Object>
+                                ? MemoryImage(_imageWeb!)
+                                    as ImageProvider<Object>
                                 : FileImage(_image!) as ImageProvider<Object>,
                             fit: BoxFit.cover,
                           )
                         : null,
                   ),
                   child: (_image == null && _imageWeb == null)
-                      ? const Icon(Icons.add_a_photo, size: 50, color: Colors.grey)
+                      ? const Icon(Icons.add_a_photo,
+                          size: 50, color: Colors.grey)
                       : null,
                 ),
               ),

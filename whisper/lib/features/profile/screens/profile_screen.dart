@@ -13,6 +13,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:whisper/features/profile/screens/create_post_screen.dart';
+import 'package:whisper/features/widgets/post_card.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -151,7 +152,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   radius: 18,
                                   backgroundColor: const Color(0xFF320064),
                                   child: IconButton(
-                                    icon: const Icon(Icons.camera_alt, size: 18),
+                                    icon:
+                                        const Icon(Icons.camera_alt, size: 18),
                                     color: Colors.white,
                                     onPressed: _updateProfileImage,
                                   ),
@@ -319,7 +321,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 onPressed: () {
                                   setState(() {
                                     _isEditing = true;
-                                    _nameController.text = user.displayName ?? '';
+                                    _nameController.text =
+                                        user.displayName ?? '';
                                     _bioController.text = user.bio ?? '';
                                   });
                                 },
@@ -355,6 +358,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
+          debugPrint('Posts stream error: ${snapshot.error}');
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -374,12 +378,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           return const Center(child: CircularProgressIndicator());
         }
 
-        final posts = snapshot.data!.docs
-                .map((doc) =>
-                    PostModel.fromJson(doc.data() as Map<String, dynamic>))
-                .toList();
-
-        if (posts.isEmpty) {
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -399,20 +398,27 @@ class _ProfileScreenState extends State<ProfileScreen>
                           builder: (context) => const CreatePostScreen()),
                     );
                   },
-                  child: const Text(
-                    'Create Post',
-                    style: TextStyle(color: Colors.white),
-                  ),
+                  child: const Text('Create Post',
+                      style: TextStyle(color: Colors.white)),
                 ),
               ],
             ),
           );
         }
 
+        final posts = snapshot.data!.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          // Convert Timestamp to DateTime if needed
+          if (data['createdAt'] is Timestamp) {
+            data['createdAt'] = (data['createdAt'] as Timestamp).toDate();
+          }
+          return PostModel.fromJson(data);
+        }).toList();
+
         return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: posts.length,
-          itemBuilder: (context, index) => _buildPostCard(posts[index]),
+          itemBuilder: (context, index) => PostCard(post: posts[index]),
         );
       },
     );

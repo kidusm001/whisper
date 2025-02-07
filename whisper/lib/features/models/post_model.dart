@@ -15,8 +15,11 @@ class PostModel {
   final int commentsCount;
   final String? tier;
   final bool isPublished;
-  
-  @JsonKey(fromJson: _timestampFromJson, toJson: _timestampToJson)
+
+  @JsonKey(
+    fromJson: _timestampFromJson,
+    toJson: _timestampToJson,
+  )
   final DateTime createdAt;
 
   PostModel({
@@ -33,17 +36,22 @@ class PostModel {
     required this.createdAt,
   });
 
-  factory PostModel.fromJson(Map<String, dynamic> json) => 
+  factory PostModel.fromJson(Map<String, dynamic> json) =>
       _$PostModelFromJson(json);
 
   Map<String, dynamic> toJson() => _$PostModelToJson(this);
 
-  static DateTime _timestampFromJson(Timestamp timestamp) {
-    return timestamp.toDate();
+  static DateTime _timestampFromJson(dynamic timestamp) {
+    if (timestamp is Timestamp) {
+      return timestamp.toDate();
+    } else if (timestamp is DateTime) {
+      return timestamp;
+    }
+    throw ArgumentError('Invalid timestamp format');
   }
 
-  static Timestamp _timestampToJson(DateTime date) {
-    return Timestamp.fromDate(date);
+  static dynamic _timestampToJson(DateTime dateTime) {
+    return Timestamp.fromDate(dateTime);
   }
 
   PostModel copyWith({
@@ -70,4 +78,4 @@ class PostModel {
       createdAt: createdAt,
     );
   }
-} 
+}

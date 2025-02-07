@@ -18,7 +18,7 @@ PostModel _$PostModelFromJson(Map<String, dynamic> json) => PostModel(
       commentsCount: (json['commentsCount'] as num?)?.toInt() ?? 0,
       tier: json['tier'] as String?,
       isPublished: json['isPublished'] as bool? ?? true,
-      createdAt: PostModel._timestampFromJson(json['createdAt'] as Timestamp),
+      createdAt: PostModel._timestampFromJson(json['createdAt']),
     );
 
 Map<String, dynamic> _$PostModelToJson(PostModel instance) => <String, dynamic>{
