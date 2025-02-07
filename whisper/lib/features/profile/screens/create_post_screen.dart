@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:uuid/uuid.dart';
+import 'package:whisper/features/models/post_model.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CreatePostScreen extends StatefulWidget {
   const CreatePostScreen({super.key});
@@ -47,6 +50,51 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     super.dispose();
   }
 
+  Future<String?> _uploadImageToSupabase(
+    dynamic imageFile,
+    String imageType,
+    String userId) async {
+    if (imageFile == null) return null;
+
+    final supabaseClient = Supabase.instance.client;
+    final fileName =
+        '${userId}_${imageType}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final imagePath = '$userId/$imageType/$fileName';
+
+    debugPrint("Uploading to path: $imagePath");
+    debugPrint("Current User UID (from FirebaseAuth): ${FirebaseAuth.instance.currentUser?.uid}");
+
+    try {
+      if (imageFile is Uint8List) {
+        await supabaseClient.storage.from('images').uploadBinary(
+          imagePath,
+          imageFile,
+          fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
+        );
+      } else if (imageFile is File) {
+        await supabaseClient.storage.from('images').upload(
+          imagePath,
+          imageFile,
+          fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
+        );
+      } else {
+        throw Exception('Unsupported image file type');
+      }
+
+      final publicUrl =
+      supabaseClient.storage.from('images').getPublicUrl(imagePath);
+      return publicUrl;
+    } catch (e) {
+      debugPrint('Error uploading image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading image: $e')),
+        );
+      }
+      return null;
+    }
+  }
+
   Future<void> _createPost() async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
@@ -54,6 +102,83 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         const SnackBar(content: Text('You must be logged in to create a post.')),
       );
       return;
+    }
+
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Prevent user from dismissing
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      var uuid = const Uuid();
+      final newPostId = uuid.v4();
+      String? imageUrl;
+
+      // Image Upload Section (NEW)
+      if (_image != null || _imageWeb != null) {
+        imageUrl = await _uploadImageToSupabase(
+          kIsWeb ? _imageWeb : _image,
+          'post', // Use a consistent image type string
+          currentUser.uid,
+        );
+
+        if (imageUrl == null) {
+          // Handle image upload failure.  Don't create the post.
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Failed to upload image.')),
+            );
+            Navigator.of(context).pop(); // Dismiss loading indicator
+          }
+          return; // Exit the function
+        }
+      }
+
+      final newPost = PostModel(
+        id: newPostId,
+        authorId: currentUser.uid,
+        title: _titleController.text,
+        content: _contentController.text,
+        mediaUrls: imageUrl != null ? [imageUrl] : [], // Add the image URL
+        mediaType: _image != null || _imageWeb != null ? 'image' : 'text',
+        likesCount: 0,
+        commentsCount: 0,
+        tier: _selectedTier,
+        isPublished: _isPublished,
+        createdAt: DateTime.now(),
+      );
+
+      await addPostToFirestore(newPost);
+
+      // Success message
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Dismiss loading indicator
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Post created successfully!')),
+        );
+        // Optionally navigate back or clear the form
+        Navigator.of(context).pop(); // Go back to the previous screen
+      }
+    } catch (e) {
+      // Error handling
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Dismiss loading indicator
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to create post: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> addPostToFirestore(PostModel post) async {
+    final supabaseClient = Supabase.instance.client;
+
+    try {
+      await supabaseClient.from('posts').upsert(post.toJson());
+    } catch (e) {
+      rethrow;
     }
   }
 
