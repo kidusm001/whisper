@@ -1,0 +1,10 @@
+// Add these rules to your existing rules
+match /chatRooms/{roomId} {
+  match /messages/{messageId} {
+    allow read: if request.auth != null && 
+      roomId.split('_').contains(request.auth.uid);
+    allow create: if request.auth != null && 
+      roomId.split('_').contains(request.auth.uid) &&
+      request.resource.data.senderId == request.auth.uid;
+  }
+} 

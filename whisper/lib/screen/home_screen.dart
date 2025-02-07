@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:whisper/features/profile/screens/profile_screen.dart';
-
+import 'package:whisper/features/payout/screens/payout_settings_screen.dart';
+import 'package:whisper/features/messages/screens/messages_list_screen.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -234,10 +235,22 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
           const Divider(),
           _buildSidebarItem(Icons.home, 'Home', isSelected: true),
-          _buildSidebarItem(Icons.message, 'Messages'),
+          _buildSidebarItem(Icons.message, 'Messages', onTap: () {
+            Navigator.pop(context); // Close the sidebar
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const MessagesListScreen(),
+              ),
+            );
+          }),
           _buildSidebarItem(Icons.group, 'My Memberships'),
           _buildSidebarItem(Icons.bookmark, 'Saved Posts'),
           _buildSidebarItem(Icons.explore, 'Explore Creators'),
+          _buildSidebarItem(Icons.payment, 'Payout', onTap: () {
+            Navigator.pop(context);
+            Navigator.push(context, MaterialPageRoute(builder: (context) => const PayoutSettingsScreen()));
+          }),
           const Spacer(),
           const Divider(),
           _buildSidebarItem(Icons.logout, 'Logout'),
@@ -247,12 +260,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildSidebarItem(IconData icon, String label, {bool isSelected = false}) {
+  Widget _buildSidebarItem(IconData icon, String label, {
+    bool isSelected = false, 
+    VoidCallback? onTap,
+  }) {
     return ListTile(
       leading: Icon(icon, color: isSelected ? Colors.blue : null),
       title: Text(label),
       selected: isSelected,
-      onTap: () {},
+      onTap: onTap ?? () {},
     );
   }
 

@@ -61,8 +61,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^4.0.0
-  build_runner: ^2.4.8
-  json_serializable: ^6.7.1
+  build_runner: ^2.4.13
+  json_serializable: ^6.9.0
   freezed: ^2.4.7
 
 # For information on the generic Dart part of this file, see the
@@ -108,3 +108,6 @@ flutter:
 
   assets:
     - assets/images/logo.png
+    - assets/images/paypal.png
+    - assets/images/stripe.png
+    - assets/images/bank.png
