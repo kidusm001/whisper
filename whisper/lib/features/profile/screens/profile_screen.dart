@@ -14,6 +14,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:whisper/features/profile/screens/create_post_screen.dart';
 import 'package:whisper/features/widgets/post_card.dart';
+import '../../../utils/fix_post_counts.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -115,8 +116,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                                     child: ElevatedButton(
                                       onPressed: _updateCoverImage,
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor:
-                                            Colors.black.withOpacity(0.7),
+                                        backgroundColor: Colors.black
+                                            .withValues(
+                                                red: 0,
+                                                green: 0,
+                                                blue: 0,
+                                                alpha: 179),
                                       ),
                                       child: const Text('Change Cover'),
                                     ),
@@ -217,7 +222,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   borderRadius: BorderRadius.circular(12),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.grey.withOpacity(0.1),
+                                      color: Colors.grey.withValues(
+                                          red: 128,
+                                          green: 128,
+                                          blue: 128,
+                                          alpha: 153),
                                       spreadRadius: 1,
                                       blurRadius: 5,
                                     ),
@@ -245,7 +254,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                             color: Colors.white,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.grey.withOpacity(0.1),
+                                color: Colors.grey.withValues(
+                                    red: 128,
+                                    green: 128,
+                                    blue: 128,
+                                    alpha: 153),
                                 spreadRadius: 1,
                                 blurRadius: 5,
                               ),
@@ -307,8 +320,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                         child: _isEditing
                             ? ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      Colors.black.withOpacity(0.7),
+                                  backgroundColor: Colors.black.withValues(
+                                      red: 0, green: 0, blue: 0, alpha: 179),
                                 ),
                                 onPressed: () => _saveProfile(user),
                                 child: const Text('Save',
@@ -354,31 +367,49 @@ class _ProfileScreenState extends State<ProfileScreen>
       stream: FirebaseFirestore.instance
           .collection('posts')
           .where('authorId', isEqualTo: userId)
+          .where('isDeleted',
+              isEqualTo: false) // This filters out deleted posts
           .orderBy('createdAt', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
+        debugPrint(
+            'Posts query snapshot: ${snapshot.hasData ? snapshot.data!.docs.length : 0} documents');
+
         if (snapshot.hasError) {
           debugPrint('Posts stream error: ${snapshot.error}');
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('Error loading posts'),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () => setState(() {}),
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          );
+          return Center(child: Text('Error: ${snapshot.error}'));
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        final posts = snapshot.data?.docs.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              debugPrint('Post data: $data');
+              if (data['createdAt'] is Timestamp) {
+                data['createdAt'] = (data['createdAt'] as Timestamp).toDate();
+              }
+              return PostModel.fromJson(data);
+            }).toList() ??
+            [];
+
+        // Fix post count if it's wrong using snapshot of current user
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userId)
+              .get();
+          final userData = userDoc.data() as Map<String, dynamic>;
+          if (posts.length != userData['postsCount']) {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(userId)
+                .update({'postsCount': posts.length});
+          }
+        });
+
+        if (posts.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -389,7 +420,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF320064),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                   ),
                   onPressed: () {
                     Navigator.push(
@@ -406,19 +439,13 @@ class _ProfileScreenState extends State<ProfileScreen>
           );
         }
 
-        final posts = snapshot.data!.docs.map((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          // Convert Timestamp to DateTime if needed
-          if (data['createdAt'] is Timestamp) {
-            data['createdAt'] = (data['createdAt'] as Timestamp).toDate();
-          }
-          return PostModel.fromJson(data);
-        }).toList();
-
         return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: posts.length,
-          itemBuilder: (context, index) => PostCard(post: posts[index]),
+          itemBuilder: (context, index) => PostCard(
+            post: posts[index],
+            onDeleted: () => setState(() {}),
+          ),
         );
       },
     );

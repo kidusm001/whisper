@@ -25,7 +25,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   bool _isPublished = true;
   String? _selectedTier;
   final List<String> _availableTiers = ['Free', 'Premium'];
-  bool _mounted = true;
 
   Future<void> _pickImage(ImageSource source) async {
     final pickedFile = await ImagePicker().pickImage(source: source);
@@ -47,14 +46,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   @override
   void dispose() {
-    _mounted = false;
     _titleController.dispose();
     _contentController.dispose();
     super.dispose();
   }
 
   Future<String?> _uploadImageToSupabase(
-      dynamic imageFile, String imageType, String userId) async {
+    dynamic imageFile,
+    String imageType,
+    String userId) async {
     if (imageFile == null) return null;
 
     final supabaseClient = Supabase.instance.client;
@@ -63,30 +63,27 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     final imagePath = '$userId/$imageType/$fileName';
 
     debugPrint("Uploading to path: $imagePath");
-    debugPrint(
-        "Current User UID (from FirebaseAuth): ${FirebaseAuth.instance.currentUser?.uid}");
+    debugPrint("Current User UID (from FirebaseAuth): ${FirebaseAuth.instance.currentUser?.uid}");
 
     try {
       if (imageFile is Uint8List) {
         await supabaseClient.storage.from('images').uploadBinary(
-              imagePath,
-              imageFile,
-              fileOptions:
-                  const FileOptions(cacheControl: '3600', upsert: false),
-            );
+          imagePath,
+          imageFile,
+          fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
+        );
       } else if (imageFile is File) {
         await supabaseClient.storage.from('images').upload(
-              imagePath,
-              imageFile,
-              fileOptions:
-                  const FileOptions(cacheControl: '3600', upsert: false),
-            );
+          imagePath,
+          imageFile,
+          fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
+        );
       } else {
         throw Exception('Unsupported image file type');
       }
 
       final publicUrl =
-          supabaseClient.storage.from('images').getPublicUrl(imagePath);
+      supabaseClient.storage.from('images').getPublicUrl(imagePath);
       return publicUrl;
     } catch (e) {
       debugPrint('Error uploading image: $e');
@@ -102,49 +99,41 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   Future<void> _createPost() async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
-      if (_mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('You must be logged in to create a post.')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be logged in to create a post.')),
+      );
       return;
     }
 
-    // Store context in local variable
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
-
     // Show loading indicator
-    if (_mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
-      );
-    }
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Prevent user from dismissing
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
 
     try {
       var uuid = const Uuid();
       final newPostId = uuid.v4();
       String? imageUrl;
 
-      // Image Upload Section
+      // Image Upload Section (NEW)
       if (_image != null || _imageWeb != null) {
         imageUrl = await _uploadImageToSupabase(
           kIsWeb ? _imageWeb : _image,
-          'post',
+          'post', // Use a consistent image type string
           currentUser.uid,
         );
 
         if (imageUrl == null) {
-          if (_mounted) {
-            scaffoldMessenger.showSnackBar(
+          // Handle image upload failure.  Don't create the post.
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Failed to upload image.')),
             );
-            navigator.pop(); // Dismiss loading indicator
+            Navigator.of(context).pop(); // Dismiss loading indicator
           }
-          return;
+          return; // Exit the function
         }
       }
 
@@ -153,7 +142,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         authorId: currentUser.uid,
         title: _titleController.text,
         content: _contentController.text,
-        mediaUrls: imageUrl != null ? [imageUrl] : [],
+        mediaUrls: imageUrl != null ? [imageUrl] : [], // Add the image URL
         mediaType: _image != null || _imageWeb != null ? 'image' : 'text',
         likesCount: 0,
         commentsCount: 0,
@@ -164,17 +153,20 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
       await addPostToFirestore(newPost);
 
-      if (_mounted) {
-        navigator.pop(); // Dismiss loading indicator
-        scaffoldMessenger.showSnackBar(
+      // Success message
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Dismiss loading indicator
+        ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Post created successfully!')),
         );
-        navigator.pop(); // Go back to the previous screen
+        // Optionally navigate back or clear the form
+        Navigator.of(context).pop(); // Go back to the previous screen
       }
     } catch (e) {
-      if (_mounted) {
-        navigator.pop(); // Dismiss loading indicator
-        scaffoldMessenger.showSnackBar(
+      // Error handling
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Dismiss loading indicator
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to create post: $e')),
         );
       }
@@ -183,33 +175,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   Future<void> addPostToFirestore(PostModel post) async {
     final firestore = FirebaseFirestore.instance;
-
     try {
-      // First, get the actual post count by querying posts collection
-      final postsCount = await firestore
-          .collection('posts')
-          .where('authorId', isEqualTo: post.authorId)
-          .count()
-          .get();
-
-      final actualCount = postsCount.count ?? 0; // Handle null case
-
-      // Use a batch write to ensure atomicity
-      final batch = firestore.batch();
-
-      // Add the post document
-      final postRef = firestore.collection('posts').doc(post.id);
-      batch.set(postRef, post.toJson());
-
-      // Update user document with accurate post count
-      final userRef = firestore.collection('users').doc(post.authorId);
-      batch.update(userRef, {'postsCount': actualCount + 1});
-
-      await batch.commit();
-
-      debugPrint('Updated post count to: ${actualCount + 1}');
+      await firestore.collection('posts').doc(post.id).set(post.toJson());
     } catch (e) {
-      debugPrint('Error creating post: $e');
       rethrow;
     }
   }
@@ -277,16 +245,14 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     image: (_image != null || _imageWeb != null)
                         ? DecorationImage(
                             image: kIsWeb
-                                ? MemoryImage(_imageWeb!)
-                                    as ImageProvider<Object>
+                                ? MemoryImage(_imageWeb!) as ImageProvider<Object>
                                 : FileImage(_image!) as ImageProvider<Object>,
                             fit: BoxFit.cover,
                           )
                         : null,
                   ),
                   child: (_image == null && _imageWeb == null)
-                      ? const Icon(Icons.add_a_photo,
-                          size: 50, color: Colors.grey)
+                      ? const Icon(Icons.add_a_photo, size: 50, color: Colors.grey)
                       : null,
                 ),
               ),

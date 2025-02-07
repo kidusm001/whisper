@@ -16,6 +16,9 @@ class PostModel {
   final String? tier;
   final bool isPublished;
 
+  @JsonKey(defaultValue: false)
+  final bool isDeleted;
+
   @JsonKey(
     fromJson: _timestampFromJson,
     toJson: _timestampToJson,
@@ -33,6 +36,7 @@ class PostModel {
     this.commentsCount = 0,
     this.tier,
     this.isPublished = true,
+    this.isDeleted = false,
     required this.createdAt,
   });
 
@@ -63,6 +67,7 @@ class PostModel {
     int? commentsCount,
     String? tier,
     bool? isPublished,
+    bool? isDeleted,
   }) {
     return PostModel(
       id: id,
@@ -75,6 +80,7 @@ class PostModel {
       commentsCount: commentsCount ?? this.commentsCount,
       tier: tier ?? this.tier,
       isPublished: isPublished ?? this.isPublished,
+      isDeleted: isDeleted ?? this.isDeleted,
       createdAt: createdAt,
     );
   }
