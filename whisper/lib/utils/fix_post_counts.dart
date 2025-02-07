@@ -5,12 +5,31 @@ Future<void> fixAllUsersPostCounts() async {
   final usersSnapshot = await firestore.collection('users').get();
 
   for (var userDoc in usersSnapshot.docs) {
-    final postsCount = await firestore
+    await fixUserPostCount(userDoc.id);
+  }
+}
+
+Future<void> fixUserPostCount(String userId) async {
+  final firestore = FirebaseFirestore.instance;
+
+  try {
+    // Get all non-deleted posts for the user
+    final postsQuery = await firestore
         .collection('posts')
-        .where('authorId', isEqualTo: userDoc.id)
-        .count()
+        .where('authorId', isEqualTo: userId)
+        .where('isDeleted', isEqualTo: false)
         .get();
 
-    await userDoc.reference.update({'postsCount': postsCount.count});
+    final actualCount = postsQuery.docs.length;
+
+    // Update user's post count with the actual count
+    await firestore
+        .collection('users')
+        .doc(userId)
+        .update({'postsCount': actualCount});
+
+    print('Fixed post count for user $userId: $actualCount active posts');
+  } catch (e) {
+    print('Error fixing post count: $e');
   }
 }
