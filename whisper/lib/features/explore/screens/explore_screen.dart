@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:whisper/widgets/universal_post_card.dart';
+import 'package:whisper/widgets/universal_app_bar.dart'; // <-- Added import
+import 'package:whisper/widgets/universal_drawer.dart'; // <-- Added import
 
 class ExploreScreen extends StatelessWidget {
   const ExploreScreen({super.key});
@@ -13,7 +15,13 @@ class ExploreScreen extends StatelessWidget {
     debugPrint('Current User ID: $currentUserId');
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Explore Posts')),
+      appBar: UniversalAppBar(
+        title: 'Explore Posts',
+        onMenuPressed: () {
+          Scaffold.of(context).openDrawer();
+        },
+      ),
+      drawer: const UniversalDrawer(),
       body: StreamBuilder<QuerySnapshot>(
         // Removed orderBy to avoid composite index error; dropping automatic ordering
         stream: FirebaseFirestore.instance

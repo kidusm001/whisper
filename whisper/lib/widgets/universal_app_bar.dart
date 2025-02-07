@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:whisper/features/profile/screens/profile_screen.dart'; // <-- Added import
 
 class UniversalAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
-  final VoidCallback onMenuPressed;
+  final VoidCallback onMenuPressed; // <-- Added property
 
   const UniversalAppBar({
     super.key,
@@ -23,7 +24,7 @@ class UniversalAppBar extends StatelessWidget implements PreferredSizeWidget {
       elevation: 0,
       leading: IconButton(
         icon: const Icon(Icons.menu),
-        onPressed: onMenuPressed,
+        onPressed: onMenuPressed, // <-- Call passed callback
       ),
       title: Text(
         title,
@@ -66,7 +67,13 @@ class UniversalAppBar extends StatelessWidget implements PreferredSizeWidget {
                       'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y');
 
               return GestureDetector(
-                onTap: () => Scaffold.of(context).openEndDrawer(),
+                // Change onTap to navigate to ProfileScreen
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                  );
+                },
                 child: CircleAvatar(
                   radius: 16,
                   backgroundImage: NetworkImage(profileImage),
