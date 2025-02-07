@@ -25,6 +25,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   bool _isPublished = true;
   String? _selectedTier;
   final List<String> _availableTiers = ['Free', 'Premium'];
+  bool _mounted = true;
 
   Future<void> _pickImage(ImageSource source) async {
     final pickedFile = await ImagePicker().pickImage(source: source);
@@ -46,6 +47,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   @override
   void dispose() {
+    _mounted = false;
     _titleController.dispose();
     _contentController.dispose();
     super.dispose();
@@ -100,42 +102,49 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   Future<void> _createPost() async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('You must be logged in to create a post.')),
-      );
+      if (_mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('You must be logged in to create a post.')),
+        );
+      }
       return;
     }
 
+    // Store context in local variable
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
     // Show loading indicator
-    showDialog(
-      context: context,
-      barrierDismissible: false, // Prevent user from dismissing
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
+    if (_mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     try {
       var uuid = const Uuid();
       final newPostId = uuid.v4();
       String? imageUrl;
 
-      // Image Upload Section (NEW)
+      // Image Upload Section
       if (_image != null || _imageWeb != null) {
         imageUrl = await _uploadImageToSupabase(
           kIsWeb ? _imageWeb : _image,
-          'post', // Use a consistent image type string
+          'post',
           currentUser.uid,
         );
 
         if (imageUrl == null) {
-          // Handle image upload failure.  Don't create the post.
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+          if (_mounted) {
+            scaffoldMessenger.showSnackBar(
               const SnackBar(content: Text('Failed to upload image.')),
             );
-            Navigator.of(context).pop(); // Dismiss loading indicator
+            navigator.pop(); // Dismiss loading indicator
           }
-          return; // Exit the function
+          return;
         }
       }
 
@@ -144,7 +153,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         authorId: currentUser.uid,
         title: _titleController.text,
         content: _contentController.text,
-        mediaUrls: imageUrl != null ? [imageUrl] : [], // Add the image URL
+        mediaUrls: imageUrl != null ? [imageUrl] : [],
         mediaType: _image != null || _imageWeb != null ? 'image' : 'text',
         likesCount: 0,
         commentsCount: 0,
@@ -155,20 +164,17 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
       await addPostToFirestore(newPost);
 
-      // Success message
-      if (context.mounted) {
-        Navigator.of(context).pop(); // Dismiss loading indicator
-        ScaffoldMessenger.of(context).showSnackBar(
+      if (_mounted) {
+        navigator.pop(); // Dismiss loading indicator
+        scaffoldMessenger.showSnackBar(
           const SnackBar(content: Text('Post created successfully!')),
         );
-        // Optionally navigate back or clear the form
-        Navigator.of(context).pop(); // Go back to the previous screen
+        navigator.pop(); // Go back to the previous screen
       }
     } catch (e) {
-      // Error handling
-      if (context.mounted) {
-        Navigator.of(context).pop(); // Dismiss loading indicator
-        ScaffoldMessenger.of(context).showSnackBar(
+      if (_mounted) {
+        navigator.pop(); // Dismiss loading indicator
+        scaffoldMessenger.showSnackBar(
           SnackBar(content: Text('Failed to create post: $e')),
         );
       }
@@ -185,8 +191,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           .where('authorId', isEqualTo: post.authorId)
           .count()
           .get();
-      
-      final actualCount = postsCount.count;
+
+      final actualCount = postsCount.count ?? 0; // Handle null case
 
       // Use a batch write to ensure atomicity
       final batch = firestore.batch();
@@ -197,13 +203,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
       // Update user document with accurate post count
       final userRef = firestore.collection('users').doc(post.authorId);
-      batch.update(userRef, {
-        'postsCount': actualCount + 1
-      });
+      batch.update(userRef, {'postsCount': actualCount + 1});
 
       await batch.commit();
-      
-      // Debug print to verify count
+
       debugPrint('Updated post count to: ${actualCount + 1}');
     } catch (e) {
       debugPrint('Error creating post: $e');
