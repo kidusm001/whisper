@@ -116,8 +116,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   );
                 }
 
-                if (snapshot.connectionState == ConnectionState.waiting &&
-                    !snapshot.hasData) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
@@ -245,13 +244,15 @@ class _PostCardState extends ConsumerState<PostCard> {
     final isFollowing =
         ref.watch(followsProvider).following[widget.post.authorId] ?? false;
 
-    return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance
           .collection('users')
           .doc(widget.post.authorId)
-          .snapshots(),
+          .get(),
       builder: (context, snapshot) {
-        final userData = snapshot.data?.data() as Map<String, dynamic>?;
+        final userData = snapshot.hasData
+            ? snapshot.data!.data() as Map<String, dynamic>?
+            : null;
         final userPhotoUrl = userData?['photoUrl'] as String?;
 
         return Card(
@@ -263,7 +264,7 @@ class _PostCardState extends ConsumerState<PostCard> {
                 leading: CircleAvatar(
                   backgroundImage: userPhotoUrl != null
                       ? NetworkImage(userPhotoUrl)
-                      : const NetworkImage('https://placeholder.com/50x50'),
+                      : const NetworkImage('https://via.placeholder.com/50'),
                 ),
                 title: Text(
                   widget.post.authorName ?? 'Anonymous',

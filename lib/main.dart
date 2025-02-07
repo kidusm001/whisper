@@ -11,6 +11,7 @@ import 'screen/subscription_tiers_screen.dart';
 import 'screen/main_navigation_screen.dart';
 import 'features/profile/screens/create_post_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 

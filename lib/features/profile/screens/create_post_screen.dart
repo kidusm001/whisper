@@ -8,7 +8,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import '../../../features/models/post_model.dart';
-import '../../../providers/posts_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -196,9 +195,17 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
         FirebaseFirestore.instance.collection('users').doc(post.authorId);
 
     batch.set(postRef, post.toJson());
-    batch.update(userRef, {'postsCount': FieldValue.increment(1)});
+    // Replace update with set using merge to safely increment postsCount
+    batch.set(userRef, {'postsCount': FieldValue.increment(1)},
+        SetOptions(merge: true));
 
-    await batch.commit();
+    try {
+      await batch.commit();
+    } catch (e) {
+      // Handle and log error as needed
+      debugPrint('Batch commit failed: $e');
+      rethrow;
+    }
   }
 
   @override
@@ -303,9 +310,9 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
               const SizedBox(height: 20),
               DropdownButtonFormField<String>(
                 value: _selectedTier,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'Select Tier',
-                  border: const OutlineInputBorder(),
+                  border: OutlineInputBorder(),
                 ),
                 items: _availableTiers.map((String tier) {
                   return DropdownMenuItem<String>(
