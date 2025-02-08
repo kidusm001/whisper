@@ -1,4 +1,30 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+
+Future<void> fixPostCounts() async {
+  try {
+    final users = await FirebaseFirestore.instance.collection('users').get();
+
+    for (var user in users.docs) {
+      final posts = await FirebaseFirestore.instance
+          .collection('posts')
+          .where('authorId', isEqualTo: user.id)
+          .where('isDeleted', isEqualTo: false)
+          .get();
+
+      await user.reference.update({
+        'postsCount': posts.docs.length,
+      });
+
+      debugPrint(
+          'Updated post count for user ${user.id}: ${posts.docs.length}');
+    }
+
+    debugPrint('Finished updating post counts for all users');
+  } catch (e) {
+    debugPrint('Error fixing post counts: $e');
+  }
+}
 
 Future<void> fixAllUsersPostCounts() async {
   final firestore = FirebaseFirestore.instance;
@@ -28,8 +54,8 @@ Future<void> fixUserPostCount(String userId) async {
         .doc(userId)
         .update({'postsCount': actualCount});
 
-    print('Fixed post count for user $userId: $actualCount active posts');
+    debugPrint('Fixed post count for user $userId: $actualCount active posts');
   } catch (e) {
-    print('Error fixing post count: $e');
+    debugPrint('Error fixing post count: $e');
   }
 }
