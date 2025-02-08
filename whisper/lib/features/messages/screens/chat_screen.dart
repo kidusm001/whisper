@@ -42,10 +42,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final roomId = chatRoomId.join('_');
 
       // Create the chat room document if it doesn't exist
-      await FirebaseFirestore.instance
-          .collection('chatRooms')
-          .doc(roomId)
-          .set({
+      await FirebaseFirestore.instance.collection('chatRooms').doc(roomId).set({
         'participants': [currentUser.uid, widget.otherUser.uid],
         'lastMessage': message.content,
         'lastMessageTime': message.timestamp,
@@ -114,6 +111,30 @@ class _ChatScreenState extends State<ChatScreen> {
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
+                  if (snapshot.error.toString().contains('permission-denied')) {
+                    // This is the first time chatting, room doesn't exist yet
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.chat_bubble_outline,
+                            size: 64,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Start a conversation with ${widget.otherUser.displayName ?? 'Anonymous'}',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
                   return Center(child: Text('Error: ${snapshot.error}'));
                 }
 
@@ -122,6 +143,30 @@ class _ChatScreenState extends State<ChatScreen> {
                 }
 
                 final messages = snapshot.data!.docs;
+
+                if (messages.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.chat_bubble_outline,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No messages yet\nStart the conversation!',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
 
                 return ListView.builder(
                   controller: _scrollController,
@@ -143,9 +188,8 @@ class _ChatScreenState extends State<ChatScreen> {
                           vertical: 10,
                         ),
                         decoration: BoxDecoration(
-                          color: isMe
-                              ? const Color(0xFF320064)
-                              : Colors.grey[300],
+                          color:
+                              isMe ? const Color(0xFF320064) : Colors.grey[300],
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -216,4 +260,4 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollController.dispose();
     super.dispose();
   }
-} 
+}
