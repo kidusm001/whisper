@@ -20,6 +20,35 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
+  bool _isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeChatRoom();
+  }
+
+  Future<void> _initializeChatRoom() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    final chatRoomId = [currentUser.uid, widget.otherUser.uid]..sort();
+    final roomId = chatRoomId.join('_');
+
+    try {
+      // Create the chat room document if it doesn't exist
+      await FirebaseFirestore.instance.collection('chatRooms').doc(roomId).set({
+        'participants': [currentUser.uid, widget.otherUser.uid],
+        'lastMessageTime': DateTime.now(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Error initializing chat room: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isInitialized = true);
+      }
+    }
+  }
 
   void _sendMessage() async {
     if (_messageController.text.trim().isEmpty) return;
@@ -110,41 +139,18 @@ class _ChatScreenState extends State<ChatScreen> {
                   .orderBy('timestamp', descending: true)
                   .snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  if (snapshot.error.toString().contains('permission-denied')) {
-                    // This is the first time chatting, room doesn't exist yet
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.chat_bubble_outline,
-                            size: 64,
-                            color: Colors.grey[400],
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Start a conversation with ${widget.otherUser.displayName ?? 'Anonymous'}',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
-
-                if (!snapshot.hasData) {
+                if (!_isInitialized) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                final messages = snapshot.data!.docs;
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text('Something went wrong: ${snapshot.error}'),
+                  );
+                }
 
-                if (messages.isEmpty) {
+                // Show empty state for both loading and empty messages
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -156,7 +162,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'No messages yet\nStart the conversation!',
+                          'Start a conversation with ${widget.otherUser.displayName ?? 'Anonymous'}',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 16,
@@ -167,6 +173,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   );
                 }
+
+                final messages = snapshot.data!.docs;
 
                 return ListView.builder(
                   controller: _scrollController,
