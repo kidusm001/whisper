@@ -29,7 +29,7 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-/build/
+build/
 
 # Symbolication related
 app.*.symbols
@@ -41,3 +41,41 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase configuration files
+google-services.json
+GoogleService-Info.plist
+firebase_app_id_file.json
+firebase_options.dart
+
+# Environment files containing secrets
+.env
+.env.*
+*.env
+env.g.dart
+
+# API keys and secrets
+**/lib/config/api_keys.dart
+**/lib/config/secrets.dart
+**/lib/config/firebase_options.dart
+
+# Firebase local emulator
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# VS Code settings that might contain sensitive data
+.vscode/settings.json
+.vscode/launch.json
+
+# Android keystore files
+*.keystore
+*.jks
+key.properties
+
+# iOS signing files
+*.mobileprovision
+*.cer
+*.p12
+*.certSigningRequest
