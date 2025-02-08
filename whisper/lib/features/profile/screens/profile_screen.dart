@@ -13,6 +13,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:whisper/features/profile/screens/create_post_screen.dart';
 import 'package:whisper/widgets/universal_post_card.dart';
+import 'package:whisper/features/profile/screens/profile_view.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   final String? userId;
@@ -541,88 +542,131 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                   final userData =
                       userSnapshot.data!.data() as Map<String, dynamic>;
                   return Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    elevation: 2,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    elevation: 3,
+                    shadowColor: Colors.black.withOpacity(0.2),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(20),
                     ),
                     child: Container(
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(20),
                         gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            Theme.of(context).colorScheme.surface,
-                            Theme.of(context)
-                                .colorScheme
-                                .surface
-                                .withOpacity(0.8),
+                            Colors.white,
+                            const Color(0xFF320064).withOpacity(0.05),
                           ],
                         ),
                       ),
-                      child: ListTile(
-                        leading: Hero(
-                          tag: 'profile-${userData['uid']}',
-                          child: CircleAvatar(
-                            backgroundImage: userData['photoUrl'] != null
-                                ? NetworkImage(userData['photoUrl'])
-                                : null,
-                            child: userData['photoUrl'] == null
-                                ? const Icon(Icons.person)
-                                : null,
-                          ),
-                        ),
-                        title: Text(
-                          userData['displayName'] ?? 'Anonymous',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
                           children: [
-                            if (userData['bio'] != null) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                userData['bio'],
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(color: Colors.grey[600]),
+                            Hero(
+                              tag: 'profile-${userData['uid']}',
+                              child: Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: const Color(0xFF320064),
+                                    width: 2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.1),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: CircleAvatar(
+                                  radius: 28,
+                                  backgroundColor: Colors.white,
+                                  backgroundImage: userData['photoUrl'] != null
+                                      ? NetworkImage(userData['photoUrl'])
+                                      : null,
+                                  child: userData['photoUrl'] == null
+                                      ? const Icon(Icons.person,
+                                          color: Color(0xFF320064), size: 32)
+                                      : null,
+                                ),
                               ),
-                            ],
-                            const SizedBox(height: 4),
-                            Text(
-                              '${userData['postsCount'] ?? 0} posts · ${userData['followerCount'] ?? userData['followersCount'] ?? 0} followers',
-                              style: TextStyle(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                                fontSize: 12,
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    userData['displayName'] ?? 'Anonymous',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  if (userData['bio'] != null) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      userData['bio'],
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.article_outlined,
+                                          size: 14, color: Colors.grey[600]),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '${userData['postsCount'] ?? 0} posts',
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Icon(Icons.people_outline,
+                                          size: 14, color: Colors.grey[600]),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '${userData['followerCount'] ?? userData['followersCount'] ?? 0} followers',
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                _navigateToUserProfile(userData['uid']);
+                              },
+                              style: TextButton.styleFrom(
+                                foregroundColor: const Color(0xFF320064),
+                                backgroundColor:
+                                    const Color(0xFF320064).withOpacity(0.1),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 8),
+                              ),
+                              child: const Text('View'),
                             ),
                           ],
                         ),
-                        trailing: TextButton(
-                          onPressed: () {
-                            _navigateToUserProfile(userData['uid']);
-                          },
-                          style: TextButton.styleFrom(
-                            foregroundColor:
-                                Theme.of(context).colorScheme.primary,
-                            backgroundColor: Theme.of(context)
-                                .colorScheme
-                                .primaryContainer
-                                .withOpacity(0.1),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                          ),
-                          child: const Text('View Profile'),
-                        ),
-                        onTap: () {
-                          _navigateToUserProfile(userData['uid']);
-                        },
                       ),
                     ),
                   );
@@ -769,7 +813,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ProfileScreen(userId: userId),
+        builder: (context) => ProfileView(userId: userId),
       ),
     );
   }
