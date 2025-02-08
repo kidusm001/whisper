@@ -542,57 +542,88 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                       userSnapshot.data!.data() as Map<String, dynamic>;
                   return Card(
                     margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: Hero(
-                        tag: 'profile-${userData['uid']}',
-                        child: CircleAvatar(
-                          backgroundImage: userData['photoUrl'] != null
-                              ? NetworkImage(userData['photoUrl'])
-                              : null,
-                          child: userData['photoUrl'] == null
-                              ? const Icon(Icons.person)
-                              : null,
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Theme.of(context).colorScheme.surface,
+                            Theme.of(context)
+                                .colorScheme
+                                .surface
+                                .withOpacity(0.8),
+                          ],
                         ),
                       ),
-                      title: Text(
-                        userData['displayName'] ?? 'Anonymous',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (userData['bio'] != null) ...[
+                      child: ListTile(
+                        leading: Hero(
+                          tag: 'profile-${userData['uid']}',
+                          child: CircleAvatar(
+                            backgroundImage: userData['photoUrl'] != null
+                                ? NetworkImage(userData['photoUrl'])
+                                : null,
+                            child: userData['photoUrl'] == null
+                                ? const Icon(Icons.person)
+                                : null,
+                          ),
+                        ),
+                        title: Text(
+                          userData['displayName'] ?? 'Anonymous',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (userData['bio'] != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                userData['bio'],
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: Colors.grey[600]),
+                              ),
+                            ],
                             const SizedBox(height: 4),
                             Text(
-                              userData['bio'],
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(color: Colors.grey[600]),
+                              '${userData['postsCount'] ?? 0} posts · ${userData['followerCount'] ?? userData['followersCount'] ?? 0} followers',
+                              style: TextStyle(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                                fontSize: 12,
+                              ),
                             ),
                           ],
-                          const SizedBox(height: 4),
-                          Text(
-                            '${userData['postsCount'] ?? 0} posts · ${userData['followersCount'] ?? 0} followers',
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 12,
+                        ),
+                        trailing: TextButton(
+                          onPressed: () {
+                            _navigateToUserProfile(userData['uid']);
+                          },
+                          style: TextButton.styleFrom(
+                            foregroundColor:
+                                Theme.of(context).colorScheme.primary,
+                            backgroundColor: Theme.of(context)
+                                .colorScheme
+                                .primaryContainer
+                                .withOpacity(0.1),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
                             ),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
                           ),
-                        ],
-                      ),
-                      trailing: TextButton(
-                        onPressed: () {
+                          child: const Text('View Profile'),
+                        ),
+                        onTap: () {
                           _navigateToUserProfile(userData['uid']);
                         },
-                        style: TextButton.styleFrom(
-                          foregroundColor:
-                              Theme.of(context).colorScheme.primary,
-                        ),
-                        child: const Text('View Profile'),
                       ),
-                      onTap: () {
-                        _navigateToUserProfile(userData['uid']);
-                      },
                     ),
                   );
                 },
