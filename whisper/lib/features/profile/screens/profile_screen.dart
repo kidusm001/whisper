@@ -7,28 +7,29 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import '../../models/user_model.dart';
-import '../../models/post_model.dart';
-import '../../models/subscription_model.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:whisper/features/profile/screens/create_post_screen.dart';
-import 'package:whisper/features/widgets/post_card.dart';
+import 'package:whisper/widgets/universal_post_card.dart';
 
-class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+class ProfileScreen extends ConsumerStatefulWidget {
+  final String? userId;
+  const ProfileScreen({super.key, this.userId});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen>
+class _ProfileScreenState extends ConsumerState<ProfileScreen>
     with SingleTickerProviderStateMixin {
   final _nameController = TextEditingController();
   final _bioController = TextEditingController();
   bool _isEditing = false;
   bool _isLoading = false;
   late TabController _tabController;
+  UserModel? _currentUser;
 
   // Platform-specific image storage
   File? _profileImage;
@@ -40,12 +41,15 @@ class _ProfileScreenState extends State<ProfileScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _migrateFollowerCount();
   }
 
   @override
   Widget build(BuildContext context) {
     final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) {
+    final targetUserId = widget.userId ?? currentUser?.uid;
+
+    if (targetUserId == null) {
       return const Scaffold(
         body: Center(child: Text('Please login to view profile')),
       );
@@ -54,7 +58,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
           .collection('users')
-          .doc(currentUser.uid)
+          .doc(targetUserId)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
@@ -70,7 +74,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         }
 
         final userData = snapshot.data!.data() as Map<String, dynamic>;
-        final user = UserModel.fromJson(userData);
+        _currentUser = UserModel.fromJson(userData);
 
         return Scaffold(
           backgroundColor: Colors.grey[50],
@@ -100,9 +104,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                           height: 200,
                           decoration: BoxDecoration(
                             color: Colors.grey[200],
-                            image: user.coverImage != null
+                            image: _currentUser?.coverImage != null
                                 ? DecorationImage(
-                                    image: NetworkImage(user.coverImage!),
+                                    image:
+                                        NetworkImage(_currentUser!.coverImage!),
                                     fit: BoxFit.cover,
                                   )
                                 : null,
@@ -135,10 +140,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                               child: CircleAvatar(
                                 radius: 50,
                                 backgroundColor: Colors.grey[200],
-                                backgroundImage: user.photoUrl != null
-                                    ? NetworkImage(user.photoUrl!)
+                                backgroundImage: _currentUser?.photoUrl != null
+                                    ? NetworkImage(_currentUser!.photoUrl!)
                                     : null,
-                                child: user.photoUrl == null
+                                child: _currentUser?.photoUrl == null
                                     ? const Icon(Icons.person,
                                         size: 50, color: Colors.grey)
                                     : null,
@@ -188,17 +193,17 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 ),
                               ] else ...[
                                 Text(
-                                  user.displayName ?? 'Add your name',
+                                  _currentUser?.displayName ?? 'Add your name',
                                   style: const TextStyle(
                                     fontSize: 24,
                                     fontWeight: FontWeight.bold,
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
-                                if (user.bio != null) ...[
+                                if (_currentUser?.bio != null) ...[
                                   const SizedBox(height: 8),
                                   Text(
-                                    user.bio!,
+                                    _currentUser!.bio!,
                                     style: TextStyle(
                                       color: Colors.grey[600],
                                       fontSize: 16,
@@ -227,11 +232,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceEvenly,
                                   children: [
-                                    _buildStatItem('Posts', user.postsCount),
                                     _buildStatItem(
-                                        'Followers', user.followersCount),
-                                    _buildStatItem(
-                                        'Following', user.followingCount),
+                                        'Posts', _currentUser?.postsCount ?? 0),
+                                    _buildStatItem('Followers',
+                                        _currentUser?.followersCount ?? 0),
+                                    _buildStatItem('Following',
+                                        _currentUser?.followingCount ?? 0),
                                   ],
                                 ),
                               ),
@@ -267,8 +273,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                           child: TabBarView(
                             controller: _tabController,
                             children: [
-                              _buildPostsTab(user.uid),
-                              _buildSubscriptionsTab(user.uid),
+                              _buildPostsTab(targetUserId),
+                              _buildSubscriptionsTab(targetUserId),
                             ],
                           ),
                         ),
@@ -310,7 +316,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   backgroundColor:
                                       Colors.black.withOpacity(0.7),
                                 ),
-                                onPressed: () => _saveProfile(user),
+                                onPressed: () => _saveProfile(_currentUser),
                                 child: const Text('Save',
                                     style: TextStyle(color: Colors.white)),
                               )
@@ -322,8 +328,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   setState(() {
                                     _isEditing = true;
                                     _nameController.text =
-                                        user.displayName ?? '';
-                                    _bioController.text = user.bio ?? '';
+                                        _currentUser?.displayName ?? '';
+                                    _bioController.text =
+                                        _currentUser?.bio ?? '';
                                   });
                                 },
                               ),
@@ -354,16 +361,11 @@ class _ProfileScreenState extends State<ProfileScreen>
       stream: FirebaseFirestore.instance
           .collection('posts')
           .where('authorId', isEqualTo: userId)
-          .where('isDeleted',
-              isEqualTo: false) // This filters out deleted posts
+          .where('isDeleted', isEqualTo: false)
           .orderBy('createdAt', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
-        debugPrint(
-            'Posts query snapshot: ${snapshot.hasData ? snapshot.data!.docs.length : 0} documents');
-
         if (snapshot.hasError) {
-          debugPrint('Posts stream error: ${snapshot.error}');
           return Center(child: Text('Error: ${snapshot.error}'));
         }
 
@@ -371,30 +373,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           return const Center(child: CircularProgressIndicator());
         }
 
-        final posts = snapshot.data?.docs.map((doc) {
-              final data = doc.data() as Map<String, dynamic>;
-              debugPrint('Post data: $data');
-              if (data['createdAt'] is Timestamp) {
-                data['createdAt'] = (data['createdAt'] as Timestamp).toDate();
-              }
-              return PostModel.fromJson(data);
-            }).toList() ??
-            [];
-
-        // Fix post count if it's wrong using snapshot of current user
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
-          final userDoc = await FirebaseFirestore.instance
-              .collection('users')
-              .doc(userId)
-              .get();
-          final userData = userDoc.data() as Map<String, dynamic>;
-          if (posts.length != userData['postsCount']) {
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(userId)
-                .update({'postsCount': posts.length});
-          }
-        });
+        final posts = snapshot.data?.docs ?? [];
 
         if (posts.isEmpty) {
           return Center(
@@ -429,123 +408,196 @@ class _ProfileScreenState extends State<ProfileScreen>
         return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: posts.length,
-          itemBuilder: (context, index) => PostCard(
-            post: posts[index],
-            onDeleted: () => setState(() {}),
-          ),
+          itemBuilder: (context, index) {
+            final postData = posts[index].data() as Map<String, dynamic>;
+            return UniversalPostCard(postData: postData);
+          },
         );
       },
     );
   }
 
-  Widget _buildPostCard(PostModel post) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (post.mediaUrls.isNotEmpty)
-            Container(
-              height: 200,
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: NetworkImage(post.mediaUrls.first),
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  post.title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(post.content),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Text('${post.likesCount} likes'),
-                    const SizedBox(width: 16),
-                    Text('${post.commentsCount} comments'),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSubscriptionsTab(String userId) {
+    final scrollController = ScrollController();
+    const pageSize = 10;
+    final followsRef = FirebaseFirestore.instance
+        .collection('follows')
+        .where('followerId', isEqualTo: userId)
+        .limit(pageSize);
+
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('subscriptions')
-          .where('subscriberId', isEqualTo: userId)
-          .where('isActive', isEqualTo: true)
-          .snapshots(),
+      stream: followsRef.snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return const Center(child: Text('Error loading subscriptions'));
+          return Center(child: Text('Error: ${snapshot.error}'));
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final subscriptions = snapshot.data?.docs
-                .map((doc) => SubscriptionModel.fromJson(
-                    doc.data() as Map<String, dynamic>))
-                .toList() ??
-            [];
+        final follows = snapshot.data?.docs ?? [];
 
-        if (subscriptions.isEmpty) {
-          return const Center(child: Text('No active subscriptions'));
-        }
+        // Sort in memory instead of using orderBy
+        follows.sort((a, b) {
+          final aData = a.data() as Map<String, dynamic>;
+          final bData = b.data() as Map<String, dynamic>;
+          final aTime =
+              (aData['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
+          final bTime =
+              (bData['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
+          return bTime.compareTo(aTime); // Descending order
+        });
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: subscriptions.length,
-          itemBuilder: (context, index) =>
-              _buildSubscriptionCard(subscriptions[index]),
-        );
-      },
-    );
-  }
-
-  Widget _buildSubscriptionCard(SubscriptionModel subscription) {
-    return FutureBuilder<DocumentSnapshot>(
-      future: FirebaseFirestore.instance
-          .collection('users')
-          .doc(subscription.creatorId)
-          .get(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const SizedBox();
-        }
-
-        final creator = UserModel.fromJson(
-          snapshot.data?.data() as Map<String, dynamic>? ?? {},
-        );
-
-        return Card(
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundImage: creator.photoUrl != null
-                  ? NetworkImage(creator.photoUrl!)
-                  : null,
+        if (follows.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.people_outline,
+                  size: 64,
+                  color: Colors.grey[400],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'You are not following anyone yet',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
             ),
-            title: Text(creator.displayName ?? 'Unknown Creator'),
-            subtitle: Text(
-                'Subscribed since: ${_formatDate(subscription.startDate)}'),
-            trailing: Text('\$${subscription.amount}/month'),
+          );
+        }
+
+        return NotificationListener<ScrollNotification>(
+          onNotification: (ScrollNotification scrollInfo) {
+            if (scrollInfo.metrics.pixels ==
+                scrollInfo.metrics.maxScrollExtent) {
+              // Load more data when reaching the bottom
+              final lastDoc = follows.last;
+              followsRef
+                  .startAfterDocument(lastDoc)
+                  .get()
+                  .then((querySnapshot) {
+                if (querySnapshot.docs.isNotEmpty) {
+                  setState(() {
+                    follows.addAll(querySnapshot.docs);
+                    // Sort the new combined list
+                    follows.sort((a, b) {
+                      final aData = a.data() as Map<String, dynamic>;
+                      final bData = b.data() as Map<String, dynamic>;
+                      final aTime =
+                          (aData['createdAt'] as Timestamp?)?.toDate() ??
+                              DateTime.now();
+                      final bTime =
+                          (bData['createdAt'] as Timestamp?)?.toDate() ??
+                              DateTime.now();
+                      return bTime.compareTo(aTime);
+                    });
+                  });
+                }
+              });
+            }
+            return true;
+          },
+          child: ListView.builder(
+            controller: scrollController,
+            padding: const EdgeInsets.all(16),
+            itemCount: follows.length + 1, // +1 for loading indicator
+            itemBuilder: (context, index) {
+              if (index == follows.length) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Center(
+                    child: follows.length % pageSize == 0
+                        ? const CircularProgressIndicator()
+                        : const SizedBox(),
+                  ),
+                );
+              }
+
+              final followData = follows[index].data() as Map<String, dynamic>;
+              return FutureBuilder<DocumentSnapshot>(
+                future: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(followData['followingId'])
+                    .get(),
+                builder: (context, userSnapshot) {
+                  if (!userSnapshot.hasData) {
+                    return const Card(
+                      margin: EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        title: LinearProgressIndicator(),
+                      ),
+                    );
+                  }
+
+                  final userData =
+                      userSnapshot.data!.data() as Map<String, dynamic>;
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      leading: Hero(
+                        tag: 'profile-${userData['uid']}',
+                        child: CircleAvatar(
+                          backgroundImage: userData['photoUrl'] != null
+                              ? NetworkImage(userData['photoUrl'])
+                              : null,
+                          child: userData['photoUrl'] == null
+                              ? const Icon(Icons.person)
+                              : null,
+                        ),
+                      ),
+                      title: Text(
+                        userData['displayName'] ?? 'Anonymous',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (userData['bio'] != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              userData['bio'],
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                          ],
+                          const SizedBox(height: 4),
+                          Text(
+                            '${userData['postsCount'] ?? 0} posts · ${userData['followersCount'] ?? 0} followers',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                      trailing: TextButton(
+                        onPressed: () {
+                          _navigateToUserProfile(userData['uid']);
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor:
+                              Theme.of(context).colorScheme.primary,
+                        ),
+                        child: const Text('View Profile'),
+                      ),
+                      onTap: () {
+                        _navigateToUserProfile(userData['uid']);
+                      },
+                    ),
+                  );
+                },
+              );
+            },
           ),
         );
       },
@@ -553,22 +605,141 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildStatItem(String label, int value) {
-    return Column(
-      children: [
-        Text(
-          value.toString(),
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+    // Use consistent field name for follower count
+    final actualValue =
+        label == 'Followers' ? (_currentUser?.followersCount ?? value) : value;
+
+    return GestureDetector(
+      onTap: () {
+        if (label == 'Followers' || label == 'Following') {
+          // Show bottom sheet with list of followers/following
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => DraggableScrollableSheet(
+              initialChildSize: 0.7,
+              minChildSize: 0.5,
+              maxChildSize: 0.95,
+              builder: (context, scrollController) => Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('follows')
+                            .where(
+                              label == 'Followers'
+                                  ? 'followingId'
+                                  : 'followerId',
+                              isEqualTo: widget.userId ??
+                                  FirebaseAuth.instance.currentUser?.uid,
+                            )
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return const Center(
+                                child: CircularProgressIndicator());
+                          }
+
+                          final users = snapshot.data!.docs;
+                          return ListView.builder(
+                            controller: scrollController,
+                            itemCount: users.length,
+                            itemBuilder: (context, index) {
+                              final userData =
+                                  users[index].data() as Map<String, dynamic>;
+                              final userId = label == 'Followers'
+                                  ? userData['followerId']
+                                  : userData['followingId'];
+
+                              return FutureBuilder<DocumentSnapshot>(
+                                future: FirebaseFirestore.instance
+                                    .collection('users')
+                                    .doc(userId)
+                                    .get(),
+                                builder: (context, userSnapshot) {
+                                  if (!userSnapshot.hasData) {
+                                    return const SizedBox.shrink();
+                                  }
+
+                                  final user = userSnapshot.data!.data()
+                                      as Map<String, dynamic>;
+                                  return ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundImage: user['photoUrl'] != null
+                                          ? NetworkImage(user['photoUrl'])
+                                          : null,
+                                    ),
+                                    title: Text(
+                                        user['displayName'] ?? 'Anonymous'),
+                                    subtitle: user['bio'] != null
+                                        ? Text(
+                                            user['bio'],
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          )
+                                        : null,
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _navigateToUserProfile(userId);
+                                    },
+                                  );
+                                },
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+      },
+      child: Column(
+        children: [
+          Text(
+            actualValue.toString(),
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.grey[600],
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey[600],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
+    );
+  }
+
+  void _navigateToUserProfile(String userId) {
+    // Navigate to user profile
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProfileScreen(userId: userId),
+      ),
     );
   }
 
@@ -648,12 +819,12 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Future<void> _updateProfileImage() async {
     await _pickImage(ImageSource.gallery, 'profile');
-    await _saveProfile(null); // Pass current user model if needed
+    await _saveProfile(_currentUser); // Pass current user model if needed
   }
 
   Future<void> _updateCoverImage() async {
     await _pickImage(ImageSource.gallery, 'cover');
-    await _saveProfile(null); // Pass current user model if needed
+    await _saveProfile(_currentUser); // Pass current user model if needed
   }
 
   Future<void> _saveProfile(UserModel? currentUser) async {
@@ -756,6 +927,27 @@ class _ProfileScreenState extends State<ProfileScreen>
       }
     } catch (e) {
       debugPrint('Error creating user document: $e');
+    }
+  }
+
+  Future<void> _migrateFollowerCount() async {
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userId ?? FirebaseAuth.instance.currentUser?.uid)
+          .get();
+
+      if (userDoc.exists) {
+        final data = userDoc.data()!;
+        if (data.containsKey('followerCount') && data['followersCount'] == 0) {
+          await userDoc.reference.update({
+            'followersCount': data['followerCount'],
+            'followerCount': FieldValue.delete(),
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error migrating follower count: $e');
     }
   }
 

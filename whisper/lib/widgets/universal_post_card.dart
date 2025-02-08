@@ -77,7 +77,7 @@ class _UniversalPostCardState extends ConsumerState<UniversalPostCard>
 
       batch.update(currentUserDoc, {'followingCount': FieldValue.increment(1)});
 
-      batch.update(targetUserDoc, {'followerCount': FieldValue.increment(1)});
+      batch.update(targetUserDoc, {'followersCount': FieldValue.increment(1)});
 
       await batch.commit();
     } catch (e) {
@@ -128,7 +128,7 @@ class _UniversalPostCardState extends ConsumerState<UniversalPostCard>
           _firestore.collection('users').doc(widget.postData['authorId']);
       batch
           .update(currentUserDoc, {'followingCount': FieldValue.increment(-1)});
-      batch.update(targetUserDoc, {'followerCount': FieldValue.increment(-1)});
+      batch.update(targetUserDoc, {'followersCount': FieldValue.increment(-1)});
       await batch.commit();
       if (mounted) {
         setState(() {
