@@ -111,14 +111,40 @@ service cloud.firestore {
       allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
     
-    // Chatting part
+    // Enhanced Messaging Rules
     match /chatRooms/{roomId} {
+      // Allow access only if user is a participant
+      allow read: if isAuthenticated() && 
+        exists(/databases/$(database)/documents/chatRooms/$(roomId)) &&
+        request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(roomId)).data.participants;
+
+      allow create: if isAuthenticated() &&
+        request.resource.data.participants.hasAll([request.auth.uid]) &&
+        request.resource.data.participants.size() == 2;
+
+      allow update: if isAuthenticated() &&
+        request.auth.uid in resource.data.participants &&
+        (request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['lastMessage', 'lastMessageTime', 'typing']));
+
       match /messages/{messageId} {
-        allow read: if request.auth != null && 
-          roomId.split('_').contains(request.auth.uid);
-        allow create: if request.auth != null && 
-          roomId.split('_').contains(request.auth.uid) &&
+        allow read: if isAuthenticated() && 
+          request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(roomId)).data.participants;
+        
+        allow create: if isAuthenticated() && 
+          request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(roomId)).data.participants &&
           request.resource.data.senderId == request.auth.uid;
+        
+        allow update: if isAuthenticated() &&
+          request.auth.uid == resource.data.senderId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+      }
+      
+      // Typing indicators subcollection
+      match /typing/{userId} {
+        allow read: if isAuthenticated() &&
+          request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(roomId)).data.participants;
+        allow write: if isAuthenticated() && request.auth.uid == userId;
       }
     }
 
