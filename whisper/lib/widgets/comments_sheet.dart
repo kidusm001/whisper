@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../features/models/comment_model.dart';
 import '../providers/comments_provider.dart';
-import '../providers/comment_likes_provider.dart';
 import 'comment_tile.dart';
 
 class CommentsSheet extends ConsumerStatefulWidget {

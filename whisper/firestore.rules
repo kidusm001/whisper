@@ -1,7 +1,10 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper functions
+
+    // -------------------------------------------------------------------
+    // Helper Functions
+    // -------------------------------------------------------------------
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -9,149 +12,173 @@ service cloud.firestore {
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
-
-    // Comments collection - Updated rules to allow replies
+    
+    // -------------------------------------------------------------------
+    // COMMENTS (Anyone can comment or reply)
+    // -------------------------------------------------------------------
     match /comments/{commentId} {
       allow read: if true;
 
-      // Allow users to create a comment or a reply
-      allow create: if isAuthenticated() && 
+      // ✅ Allow ANY authenticated user to create a comment or reply.
+      // A reply is simply a comment with an additional "parentId".
+      allow create: if isAuthenticated() &&
         request.resource.data.authorId == request.auth.uid &&
         request.resource.data.postId is string &&
+        request.resource.data.content is string &&
+        request.resource.data.content.size() > 0 &&
+        request.resource.data.content.size() <= 10000 &&
         (
-          !request.resource.data.keys().hasAny(['parentId']) || 
-          request.resource.data.parentId is string
+          !request.resource.data.keys().hasAny(['parentId', 'replyToId', 'replyToName']) ||
+          (
+            request.resource.data.parentId is string &&
+            request.resource.data.replyToId is string &&
+            request.resource.data.replyToName is string
+          )
         );
 
-      allow update: if isAuthenticated() && (
-        // Allow original author to edit their comment/reply
-        request.auth.uid == resource.data.authorId ||
-        // Allow likes updates by checking only likesCount and likedBy changes
-        (request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['likesCount', 'likedBy', 'replyCount']))
-      );
+      // ✅ Allow update if:
+      // 1. User is the original author
+      // 2. The only changes are: likesCount, likedBy, replyCount, updatedAt
+      allow update: if isAuthenticated() &&
+        (request.auth.uid == resource.data.authorId ||
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+           'likesCount', 'likedBy', 'replyCount', 'updatedAt'
+         ])
+        );
 
-      allow delete: if isAuthenticated() && 
+      // ✅ Allow delete ONLY if the comment author is the one deleting it
+      allow delete: if isAuthenticated() &&
         request.auth.uid == resource.data.authorId;
     }
-
-    // Comment likes collection - New specific rules
+    
+    // -------------------------------------------------------------------
+    // COMMENT LIKES (unchanged)
+    // -------------------------------------------------------------------
     match /comment_likes/{likeId} {
       allow read: if true;
-      allow write: if isAuthenticated() && 
-        likeId.matches(request.auth.uid + '_.*');
+      allow write: if isAuthenticated() && likeId.matches(request.auth.uid + '_.*');
     }
-
-    // Posts collection - Updated to handle comment counts
+    
+    // -------------------------------------------------------------------
+    // POSTS (and its comments subcollection)
+    // -------------------------------------------------------------------
     match /posts/{postId} {
       allow read: if true;
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (
-        request.auth.uid == resource.data.authorId ||
-        // Allow comment count updates
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['commentCount'])
-      );
-      allow delete: if isAuthenticated() && 
-        request.auth.uid == resource.data.authorId;
-
-      // Comments subcollection
+      allow update: if isAuthenticated() &&
+        ( request.auth.uid == resource.data.authorId ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentCount'])
+        );
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.authorId;
+      
+      // Comments subcollection under posts uses similar rules.
       match /comments/{commentId} {
         allow read: if true;
-
-        // Allow users to create a comment or reply
         allow create: if isAuthenticated() &&
           request.resource.data.authorId == request.auth.uid &&
           request.resource.data.postId is string &&
           (
-            !request.resource.data.keys().hasAny(['parentId']) || 
+            !request.resource.data.keys().hasAny(['parentId']) ||
             request.resource.data.parentId is string
           );
-
-        allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.authorId;
+        allow update, delete: if isAuthenticated() &&
+          request.auth.uid == resource.data.authorId;
+        
+        // (Optional) If you store replies as a subcollection under post comments,
+        // you can add a similar replies rule here.
+        match /replies/{replyId} {
+          allow read: if true;
+          allow create: if isAuthenticated() &&
+            request.resource.data.authorId == request.auth.uid &&
+            request.resource.data.postId is string;
+          allow update, delete: if isAuthenticated() &&
+            request.auth.uid == resource.data.authorId;
+        }
       }
       
-      // Likes subcollection
+      // Likes subcollection under posts
       match /likes/{likeId} {
         allow read: if true;
         allow create, delete: if isAuthenticated();
       }
     }
-
-    // Add follows collection rules
+    
+    // -------------------------------------------------------------------
+    // FOLLOWS
+    // -------------------------------------------------------------------
     match /follows/{followId} {
       allow read: if true;
-      allow create: if isAuthenticated();
-      allow delete: if isAuthenticated() && (
-        request.auth.uid == resource.data.followerId
-      );
-    }
-
-    // User collection rules
-    match /users/{userId} {
-      allow read: if true;
-      allow update: if isAuthenticated() && (
-        request.auth.uid == userId || 
-        (request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['followerCount', 'followingCount']))
-      );
-      allow create: if isAuthenticated();
-    }
-
-    // Content access rules
-    match /content/{contentId} {
-      allow read: if true;
-      allow write: if isAuthenticated() && request.auth.uid == resource.data.creatorId;
-    }
-
-    // Subscription rules
-    match /subscriptions/{subscriptionId} {
-      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // Allow creation only if the follow document's 'followerId'
+      // equals the authenticated user's UID.
+      allow create: if isAuthenticated() &&
+        request.resource.data.followerId == request.auth.uid;
+      
+      // Allow deletion if the authenticated user is the follower.
+      allow delete: if isAuthenticated() &&
+        request.auth.uid == resource.data.followerId;
     }
     
-    // Enhanced Messaging Rules
-    match /chatRooms/{roomId} {
-      // Allow access only if user is a participant
-      allow read: if isAuthenticated() && 
-        exists(/databases/$(database)/documents/chatRooms/$(roomId)) &&
-        request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(roomId)).data.participants;
-
-      allow create: if isAuthenticated() &&
-        request.resource.data.participants.hasAll([request.auth.uid]) &&
-        request.resource.data.participants.size() == 2;
-
-      allow update: if isAuthenticated() &&
-        request.auth.uid in resource.data.participants &&
-        (request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['lastMessage', 'lastMessageTime', 'typing']));
-
-      match /messages/{messageId} {
-        allow read: if isAuthenticated() && 
-          request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(roomId)).data.participants;
-        
-        allow create: if isAuthenticated() && 
-          request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(roomId)).data.participants &&
-          request.resource.data.senderId == request.auth.uid;
-        
-        allow update: if isAuthenticated() &&
-          request.auth.uid == resource.data.senderId &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
-      }
+    // -------------------------------------------------------------------
+    // USERS
+    // -------------------------------------------------------------------
+    match /users/{userId} {
+      allow read: if true;
       
-      // Typing indicators subcollection
-      match /typing/{userId} {
-        allow read: if isAuthenticated() &&
-          request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(roomId)).data.participants;
-        allow write: if isAuthenticated() && request.auth.uid == userId;
+      // Allow update if either:
+      //  • You are updating your own document, OR
+      //  • The only changes are to follow counters.
+      // In your code, you update "followingCount" for the current user
+      // and "followersCount" for the target user.
+      allow update: if isAuthenticated() &&
+        ( request.auth.uid == userId ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followersCount', 'followingCount'])
+        );
+      
+      allow create: if isAuthenticated();
+    }
+    
+    // -------------------------------------------------------------------
+    // CONTENT (unchanged)
+    // -------------------------------------------------------------------
+    match /content/{contentId} {
+      allow read: if true;
+      allow write: if isAuthenticated() &&
+        request.auth.uid == resource.data.creatorId;
+    }
+    
+    // -------------------------------------------------------------------
+    // SUBSCRIPTIONS (unchanged)
+    // -------------------------------------------------------------------
+    match /subscriptions/{subscriptionId} {
+      allow read: if isAuthenticated() &&
+        request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // -------------------------------------------------------------------
+    // CHAT (Reverted to your known–working rules)
+    // -------------------------------------------------------------------
+    match /chatRooms/{roomId} {
+      match /messages/{messageId} {
+        allow read: if request.auth != null &&
+          roomId.split('_').contains(request.auth.uid);
+        allow create: if request.auth != null &&
+          roomId.split('_').contains(request.auth.uid) &&
+          request.resource.data.senderId == request.auth.uid;
       }
     }
-
-    // Tier access rules
+    
+    // -------------------------------------------------------------------
+    // TIERS (unchanged)
+    // -------------------------------------------------------------------
     match /tiers/{tier} {
       allow read: if true;
-      allow write: if isAuthenticated() && request.auth.token.admin == true;
+      allow write: if isAuthenticated() &&
+        request.auth.token.admin == true;
     }
   }
 }
